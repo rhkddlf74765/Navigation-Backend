@@ -35,6 +35,6 @@ public interface NavigationRepository {
      * @param metricPoints
      * @return
      */
-//    List<Wgs84PointRow> transformMetricPointsToWgs84(List<Point3D> metricPoints);
+    List<Wgs84PointRow> transformMetricPointsToWgs84(List<Point3D> metricPoints);
 
 }

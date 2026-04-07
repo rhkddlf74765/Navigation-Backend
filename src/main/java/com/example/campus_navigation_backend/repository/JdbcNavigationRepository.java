@@ -8,27 +8,29 @@ import com.example.campus_navigation_backend.repository.dto.LineSegmentRow;
 import com.example.campus_navigation_backend.repository.dto.TransformedPointRow;
 import com.example.campus_navigation_backend.support.GeoJsonGeometryParser;
 import com.example.campus_navigation_backend.visualizer.Wgs84PointRow;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
 
 @Repository
+@RequiredArgsConstructor
 public class JdbcNavigationRepository implements NavigationRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final NavigationProperties properties;
     private final GeoJsonGeometryParser geoJsonGeometryParser;
 
-    public JdbcNavigationRepository(NamedParameterJdbcTemplate jdbc,
-                                    NavigationProperties properties,
-                                    GeoJsonGeometryParser geoJsonGeometryParser) {
-        this.jdbc = jdbc;
-        this.properties = properties;
-        this.geoJsonGeometryParser = geoJsonGeometryParser;
-    }
+    /*
+        검증을 위해 추가한 필드
+     */
+    private final ObjectMapper objectMapper;
+
 
     @Override
     public List<LineSegmentRow> findAllWalkableLineSegments() {
@@ -273,69 +275,69 @@ public class JdbcNavigationRepository implements NavigationRepository {
         ################################################################################
         검증을 위해 추가한 메서드
      */
-//    @Override
-//    public List<Wgs84PointRow> transformMetricPointsToWgs84(List<Point3D> metricPoints) {
-//        if (metricPoints == null || metricPoints.isEmpty()) {
-//            return List.of();
-//        }
-//
-//        String pointsJson = toPointsJson(metricPoints);
-//
-//        String sql = """
-//            WITH input AS (
-//                SELECT
-//                    ordinality AS seq,
-//                    ST_Transform(
-//                        ST_SetSRID(
-//                            ST_MakePoint(
-//                                (elem ->> 'x')::double precision,
-//                                (elem ->> 'y')::double precision,
-//                                COALESCE((elem ->> 'z')::double precision, 0)
-//                            ),
-//                            :metricSrid
-//                        ),
-//                        4326
-//                    ) AS geom
-//                FROM jsonb_array_elements(CAST(:pointsJson AS jsonb)) WITH ORDINALITY AS t(elem, ordinality)
-//            )
-//            SELECT
-//                seq,
-//                ST_X(geom) AS longitude,
-//                ST_Y(geom) AS latitude,
-//                COALESCE(ST_Z(geom), 0) AS altitude
-//            FROM input
-//            ORDER BY seq
-//            """;
-//
-//        MapSqlParameterSource params = new MapSqlParameterSource()
-//                .addValue("metricSrid", properties.metricSrid())
-//                .addValue("pointsJson", pointsJson);
-//
-//        return jdbc.query(sql, params, (rs, rowNum) ->
-//                new Wgs84PointRow(
-//                        rs.getLong("seq"),
-//                        rs.getDouble("longitude"),
-//                        rs.getDouble("latitude"),
-//                        rs.getDouble("altitude")
-//                )
-//        );
-//    }
-//
-//    private String toPointsJson(List<Point3D> metricPoints) {
-//        try {
-//            List<Map<String, Double>> payload = metricPoints.stream()
-//                    .map(point -> Map.of(
-//                            "x", point.x(),
-//                            "y", point.y(),
-//                            "z", point.z()
-//                    ))
-//                    .toList();
-//
-//            return objectMapper.writeValueAsString(payload);
-//        } catch (JsonProcessingException e) {
-//            throw new IllegalStateException("경로 좌표를 JSON으로 직렬화하는 데 실패했습니다.", e);
-//        }
-//    }
+    @Override
+    public List<Wgs84PointRow> transformMetricPointsToWgs84(List<Point3D> metricPoints) {
+        if (metricPoints == null || metricPoints.isEmpty()) {
+            return List.of();
+        }
+
+        String pointsJson = toPointsJson(metricPoints);
+
+        String sql = """
+            WITH input AS (
+                SELECT
+                    ordinality AS seq,
+                    ST_Transform(
+                        ST_SetSRID(
+                            ST_MakePoint(
+                                (elem ->> 'x')::double precision,
+                                (elem ->> 'y')::double precision,
+                                COALESCE((elem ->> 'z')::double precision, 0)
+                            ),
+                            :metricSrid
+                        ),
+                        4326
+                    ) AS geom
+                FROM jsonb_array_elements(CAST(:pointsJson AS jsonb)) WITH ORDINALITY AS t(elem, ordinality)
+            )
+            SELECT
+                seq,
+                ST_X(geom) AS longitude,
+                ST_Y(geom) AS latitude,
+                COALESCE(ST_Z(geom), 0) AS altitude
+            FROM input
+            ORDER BY seq
+            """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("metricSrid", properties.metricSrid())
+                .addValue("pointsJson", pointsJson);
+
+        return jdbc.query(sql, params, (rs, rowNum) ->
+                new Wgs84PointRow(
+                        rs.getLong("seq"),
+                        rs.getDouble("longitude"),
+                        rs.getDouble("latitude"),
+                        rs.getDouble("altitude")
+                )
+        );
+    }
+
+    private String toPointsJson(List<Point3D> metricPoints) {
+        try {
+            List<Map<String, Double>> payload = metricPoints.stream()
+                    .map(point -> Map.of(
+                            "x", point.x(),
+                            "y", point.y(),
+                            "z", point.z()
+                    ))
+                    .toList();
+
+            return objectMapper.writeValueAsString(payload);
+        } catch (JacksonException e) {
+            throw new IllegalStateException("경로 좌표를 JSON으로 직렬화하는 데 실패했습니다.", e);
+        }
+    }
     /*
         ################################################################################
         ################################################################################
