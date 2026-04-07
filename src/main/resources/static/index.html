@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Navigation Test</title>
+
+    <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+            crossorigin=""
+    />
+    <script
+            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""
+    ></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; }
+
+        .layout {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 360px;
+            padding: 20px;
+            border-right: 1px solid #ddd;
+            background: #fafafa;
+            overflow-y: auto;
+        }
+
+        .sidebar h1 {
+            margin-top: 0;
+            font-size: 22px;
+        }
+
+        .form-group { margin-bottom: 14px; }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 14px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 14px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .status {
+            margin-top: 14px;
+            min-height: 24px;
+            font-size: 14px;
+        }
+
+        .summary {
+            margin-top: 16px;
+            padding: 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+
+        .hint {
+            color: #555;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .current-location-box {
+            margin-top: 12px;
+            padding: 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h1>캠퍼스 경로 검증</h1>
+
+        <div class="button-row">
+            <button id="selectStartButton" type="button">현재 위치 추가</button>
+            <button id="routeButton" type="button">route</button>
+            <button id="clearButton" type="button">clear</button>
+        </div>
+
+        <div class="current-location-box" id="currentLocationBox">
+            현재 위치가 아직 선택되지 않았습니다.
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+            <label for="destinationBuildingName">도착 건물</label>
+            <input id="destinationBuildingName" type="text" placeholder="예: 제1공학관">
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="summary" id="summary">
+            아직 경로를 요청하지 않았습니다.
+        </div>
+
+        <p class="hint">
+            "현재 위치 추가"를 누른 뒤 지도에서 한 번 클릭하면 현재 위치가 설정된다.
+        </p>
+    </aside>
+
+    <div id="map"></div>
+</div>
+
+<script>
+    const DEFAULT_CENTER = [37.5558, 127.0451];
+    const DEFAULT_ZOOM = 17;
+
+    const map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const routeLayerGroup = L.layerGroup().addTo(map);
+    const markerLayerGroup = L.layerGroup().addTo(map);
+
+    const selectStartButton = document.getElementById('selectStartButton');
+    const routeButton = document.getElementById('routeButton');
+    const clearButton = document.getElementById('clearButton');
+    const destinationInput = document.getElementById('destinationBuildingName');
+    const statusEl = document.getElementById('status');
+    const summaryEl = document.getElementById('summary');
+    const currentLocationBox = document.getElementById('currentLocationBox');
+
+    let isSelectingStartPoint = false;
+    let selectedStartPoint = null; // { latitude, longitude, altitude }
+    let currentLocationMarker = null;
+
+    function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.style.color = isError ? 'crimson' : '#222';
+    }
+
+    function clearRouteOnly() {
+        routeLayerGroup.clearLayers();
+        summaryEl.innerHTML = '아직 경로를 요청하지 않았습니다.';
+    }
+
+    function clearAll() {
+        routeLayerGroup.clearLayers();
+        markerLayerGroup.clearLayers();
+        summaryEl.innerHTML = '아직 경로를 요청하지 않았습니다.';
+        currentLocationBox.innerHTML = '현재 위치가 아직 선택되지 않았습니다.';
+        selectedStartPoint = null;
+        currentLocationMarker = null;
+        isSelectingStartPoint = false;
+        setStatus('지도에 표시된 현재 위치와 경로를 모두 삭제했다.');
+    }
+
+    function updateCurrentLocationBox() {
+        if (!selectedStartPoint) {
+            currentLocationBox.innerHTML = '현재 위치가 아직 선택되지 않았습니다.';
+            return;
+        }
+
+        currentLocationBox.innerHTML = `
+            <strong>선택된 현재 위치</strong><br>
+            latitude: ${selectedStartPoint.latitude.toFixed(7)}<br>
+            longitude: ${selectedStartPoint.longitude.toFixed(7)}<br>
+            altitude: ${selectedStartPoint.altitude.toFixed(2)}
+        `;
+    }
+
+    selectStartButton.addEventListener('click', () => {
+        isSelectingStartPoint = true;
+        setStatus('지도에서 한 번 클릭하여 현재 위치를 선택하세요.');
+    });
+
+    map.on('click', (event) => {
+        if (!isSelectingStartPoint) {
+            return;
+        }
+
+        const { lat, lng } = event.latlng;
+
+        selectedStartPoint = {
+            latitude: lat,
+            longitude: lng,
+            altitude: 0.0
+        };
+
+        markerLayerGroup.clearLayers();
+
+        currentLocationMarker = L.marker([lat, lng])
+            .bindPopup('현재 위치')
+            .addTo(markerLayerGroup);
+
+        currentLocationMarker.openPopup();
+
+        updateCurrentLocationBox();
+
+        isSelectingStartPoint = false;
+        clearRouteOnly();
+        setStatus('현재 위치가 설정되었다.');
+    });
+
+    async function requestRoute() {
+        if (!selectedStartPoint) {
+            setStatus('먼저 "현재 위치 추가" 버튼을 누르고 지도에서 현재 위치를 선택해야 한다.', true);
+            return;
+        }
+
+        const destinationBuildingName = destinationInput.value.trim();
+
+        if (!destinationBuildingName) {
+            setStatus('도착 건물명을 입력해야 한다.', true);
+            return;
+        }
+
+        clearRouteOnly();
+        setStatus('경로를 요청하는 중...');
+
+        try {
+            const response = await fetch('/api/navigation/route-map', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    longitude: selectedStartPoint.longitude,
+                    latitude: selectedStartPoint.latitude,
+                    altitude: selectedStartPoint.altitude,
+                    destinationBuildingName
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || '서버 요청에 실패했다.');
+            }
+
+            const data = await response.json();
+
+            const startLatLng = [data.startPoint.latitude, data.startPoint.longitude];
+
+            markerLayerGroup.clearLayers();
+
+            currentLocationMarker = L.marker(startLatLng)
+                .bindPopup('현재 위치')
+                .addTo(markerLayerGroup);
+
+            const pathLatLngs = data.path.map(point => [point.latitude, point.longitude]);
+
+            if (pathLatLngs.length > 0) {
+                const polyline = L.polyline(pathLatLngs, {
+                    weight: 6
+                }).addTo(routeLayerGroup);
+
+                const endLatLng = pathLatLngs[pathLatLngs.length - 1];
+
+                L.marker(endLatLng)
+                    .bindPopup('도착 지점')
+                    .addTo(markerLayerGroup);
+
+                const bounds = polyline.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds.pad(0.2));
+                } else {
+                    map.setView(startLatLng, DEFAULT_ZOOM);
+                }
+            } else {
+                map.setView(startLatLng, DEFAULT_ZOOM);
+            }
+
+            currentLocationMarker.openPopup();
+
+            summaryEl.innerHTML = `
+                <strong>도착 건물:</strong> ${data.destinationBuildingName}<br>
+                <strong>선택된 입구 ID:</strong> ${data.selectedEntranceId}<br>
+                <strong>총 거리:</strong> ${data.totalDistanceMeters.toFixed(2)} m<br>
+                <strong>접근 거리:</strong> ${data.approachDistanceMeters.toFixed(2)} m<br>
+                <strong>그래프 거리:</strong> ${data.graphDistanceMeters.toFixed(2)} m<br>
+                <strong>경로 점 개수:</strong> ${data.path.length}
+            `;
+
+            setStatus('경로를 성공적으로 표시했다.');
+        } catch (error) {
+            setStatus(`오류: ${error.message}`, true);
+        }
+    }
+
+    routeButton.addEventListener('click', requestRoute);
+    clearButton.addEventListener('click', clearAll);
+</script>
+</body>
+</html>
