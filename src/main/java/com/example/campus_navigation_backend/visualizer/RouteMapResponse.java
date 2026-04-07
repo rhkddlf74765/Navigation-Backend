@@ -1,13 +1,14 @@
-package com.example.campus_navigation_backend.application.dto;
+package com.example.campus_navigation_backend.visualizer;
 
 import java.util.List;
 
-public record RouteResponse(
+public record RouteMapResponse(
         String destinationBuildingName,
         long selectedEntranceId,
         double totalDistanceMeters,
         double approachDistanceMeters,
         double graphDistanceMeters,
-        List<RoutePoint> path
-) {
+        MapPoint startPoint,
+        List<MapPoint> path
+){
 }

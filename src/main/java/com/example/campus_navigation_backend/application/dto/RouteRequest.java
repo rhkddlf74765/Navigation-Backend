@@ -1,9 +1,12 @@
 package com.example.campus_navigation_backend.application.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 public record RouteRequest(
-        double longitude,
-        double latitude,
+        @NotNull Double longitude,
+        @NotNull Double latitude,
         Double altitude,
-        String destinationBuildingName
+        @NotBlank String destinationBuildingName
 ) {
 }
