@@ -23,4 +23,15 @@ public record LineSegmentRow(
     public Point3D endPoint() {
         return new Point3D(endX, endY, endZ);
     }
+
+    /**
+     * endPoint와 startPoint의 고도 차를 반환한다.
+     * <p> elevation > 0 : start -> end 방향은 오르막
+     * <p> elevation < 0 : start -> end 방향은 내리막
+     * <p> elevation == 0 : 평지
+     * @return
+     */
+    public double elevationDelta() {
+        return endZ - startZ;
+    }
 }

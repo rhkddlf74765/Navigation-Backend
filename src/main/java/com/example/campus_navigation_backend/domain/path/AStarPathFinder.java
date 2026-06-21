@@ -1,28 +1,43 @@
 package com.example.campus_navigation_backend.domain.path;
 
-import com.example.campus_navigation_backend.domain.graph.CampusGraph;
+import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
 import com.example.campus_navigation_backend.domain.graph.GraphEdge;
-import com.example.campus_navigation_backend.domain.graph.Point3D;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
 
 /**
- * A* 알고리즘 수행
+ * CampusGraphStore를 통해 그래프를 읽고 A* 알고리즘으로 최단 경로를 탐색한다.
  */
 @Component
+@RequiredArgsConstructor
 public class AStarPathFinder {
 
     private static final double EPS = 1e-6;
+    private final CampusGraphStore campusGraphStore;
 
-    public PathResult findPath(CampusGraph graph, long startNodeId, long goalNodeId) {
+    /**
+     * 출발 노드에서 도착 노드까지의 최단 경로를 탐색한다.
+     *
+     * @param startNodeId 출발 노드 ID
+     * @param goalNodeId 도착 노드 ID
+     * @return 경로 탐색 결과
+     */
+    public PathResult findPath(long startNodeId, long goalNodeId) {
         PriorityQueue<SearchState> open = new PriorityQueue<>(Comparator.comparingDouble(SearchState::fScore));
         Map<Long, Double> gScore = new HashMap<>();
         Map<Long, Long> cameFromNode = new HashMap<>();
         Map<Long, GraphEdge> cameFromEdge = new HashMap<>();
 
         gScore.put(startNodeId, 0.0);
-        open.add(new SearchState(startNodeId, heuristic(graph, startNodeId, goalNodeId)));
+        open.add(new SearchState(startNodeId, heuristic(startNodeId, goalNodeId)));
 
         while (!open.isEmpty()) {
             SearchState current = open.poll();
@@ -31,7 +46,7 @@ public class AStarPathFinder {
                 return reconstructPath(startNodeId, goalNodeId, cameFromNode, cameFromEdge, gScore.get(goalNodeId));
             }
 
-            for (GraphEdge edge : graph.getAdjacency(current.nodeId())) {
+            for (GraphEdge edge : campusGraphStore.getAdjacency(current.nodeId())) {
                 double tentative = gScore.get(current.nodeId()) + edge.cost();
 
                 if (tentative + EPS < gScore.getOrDefault(edge.toNodeId(), Double.POSITIVE_INFINITY)) {
@@ -39,7 +54,7 @@ public class AStarPathFinder {
                     cameFromNode.put(edge.toNodeId(), current.nodeId());
                     cameFromEdge.put(edge.toNodeId(), edge);
 
-                    double fScore = tentative + heuristic(graph, edge.toNodeId(), goalNodeId);
+                    double fScore = tentative + heuristic(edge.toNodeId(), goalNodeId);
                     open.add(new SearchState(edge.toNodeId(), fScore));
                 }
             }
@@ -48,12 +63,27 @@ public class AStarPathFinder {
         return PathResult.unreachable();
     }
 
-    private double heuristic(CampusGraph graph, long nodeId, long goalNodeId) {
-        Point3D a = graph.getNode(nodeId).point();
-        Point3D b = graph.getNode(goalNodeId).point();
-        return a.distance2D(b);
+    /**
+     * A* 휴리스틱으로 사용할 현재 노드와 목표 노드 사이의 2D 직선 거리를 계산한다.
+     *
+     * @param nodeId 현재 노드 ID
+     * @param goalNodeId 목표 노드 ID
+     * @return 휴리스틱 거리
+     */
+    private double heuristic(long nodeId, long goalNodeId) {
+        return campusGraphStore.distance2D(nodeId, goalNodeId);
     }
 
+    /**
+     * 탐색 중 기록한 이전 노드와 엣지를 따라 최종 경로를 복원한다.
+     *
+     * @param startNodeId 출발 노드 ID
+     * @param goalNodeId 도착 노드 ID
+     * @param cameFromNode 각 노드의 이전 노드 매핑
+     * @param cameFromEdge 각 노드로 진입할 때 사용한 엣지 매핑
+     * @param totalCost 최종 누적 비용
+     * @return 복원된 경로 결과
+     */
     private PathResult reconstructPath(long startNodeId,
                                        long goalNodeId,
                                        Map<Long, Long> cameFromNode,

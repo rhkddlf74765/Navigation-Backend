@@ -11,15 +11,31 @@ import java.util.List;
 
 /**
  * GeoJSON 파싱 담당
+ * <p> DB에서 받은 geometry 문자열을 도메인 좌표 객체로 변환한다.
  */
 @Component
 @RequiredArgsConstructor
 public class GeoJsonGeometryParser {
     /**
-     * PostGIS에서 받은 문자열을 파싱한다.
-     * Point3D, List<Point3D>를 생성한다.
+     * PostGIS에서 받은 JSON 문자열을 파싱한다.
+     * 그 결과로 Point3D, List<Point3D>를 생성한다.
      */
     private final ObjectMapper objectMapper;
+
+    public List<Point3D> parseGeometry(String geoJson) {
+        if (geoJson == null || geoJson.isBlank()) {
+            return List.of();
+        }
+
+        JsonNode root = readTree(geoJson);
+        String type = getType(root);
+
+        return switch (type) {
+            case "LineString" -> parseLineString(geoJson);
+            case "Point" -> List.of(parsePoint(geoJson));
+            default -> throw new IllegalArgumentException("지원하지 않는 GeoJSON type입니다. type=" + type);
+        };
+    }
 
     public List<Point3D> parseLineString(String geoJson) {
         if (geoJson == null || geoJson.isBlank()) {
@@ -63,21 +79,6 @@ public class GeoJsonGeometryParser {
         }
 
         return toPoint3D(coordinates);
-    }
-
-    public List<Point3D> parseGeometry(String geoJson) {
-        if (geoJson == null || geoJson.isBlank()) {
-            return List.of();
-        }
-
-        JsonNode root = readTree(geoJson);
-        String type = getType(root);
-
-        return switch (type) {
-            case "LineString" -> parseLineString(geoJson);
-            case "Point" -> List.of(parsePoint(geoJson));
-            default -> throw new IllegalArgumentException("지원하지 않는 GeoJSON type입니다. type=" + type);
-        };
     }
 
     private JsonNode readTree(String geoJson) {

@@ -18,6 +18,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * NamedParameterJdbcTemplate으로 PostGIS SQL을 실행하는 NavigationRepository 구현체이다.
+ */
 @Repository
 @RequiredArgsConstructor
 public class JdbcNavigationRepository implements NavigationRepository {
@@ -32,6 +35,11 @@ public class JdbcNavigationRepository implements NavigationRepository {
     private final ObjectMapper objectMapper;
 
 
+    /**
+     * 보행 가능한 OSM highway 선분을 metric 좌표계로 변환해 조회한다.
+     *
+     * @return 그래프 base edge 생성에 사용할 도로 선분 목록
+     */
     @Override
     public List<LineSegmentRow> findAllWalkableLineSegments() {
         String sql = """
@@ -48,7 +56,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                     ST_AsGeoJSON(mgeom) AS geom_json
                 FROM (
                     SELECT id, highway, ST_Transform(geom, :metricSrid) AS mgeom
-                    FROM raw_schemas_osm.all_lines_split
+                    FROM public.final_edges
                     WHERE geom IS NOT NULL
                       AND highway IN (:walkableHighways)
                 ) t
@@ -74,6 +82,11 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
+    /**
+     * 각 출입구를 가장 가까운 보행로에 투영하고 connector 및 분할 선분 정보를 조회한다.
+     *
+     * @return 출입구와 보행로 투영 정보 목록
+     */
     @Override
     public List<EntranceProjectionRow> findAllEntranceProjections() {
         String sql = """
@@ -83,7 +96,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                         description,
                         node_type,
                         ST_Transform(geom_3d, :metricSrid) AS entrance_geom
-                    FROM raw_schemas_osm.entrance_3d
+                    FROM public.entrances
                     WHERE geom_3d IS NOT NULL
                 ),
                 matched AS (
@@ -93,11 +106,12 @@ public class JdbcNavigationRepository implements NavigationRepository {
                         e.node_type,
                         e.entrance_geom,
                         l.id AS line_id,
+                        l.highway AS line_highway,
                         ST_Transform(l.geom, :metricSrid) AS line_geom
                     FROM entrances e
                     JOIN LATERAL (
-                        SELECT id, geom
-                        FROM raw_schemas_osm.all_lines_split
+                        SELECT id, geom, highway
+                        FROM public.final_edges
                         WHERE geom IS NOT NULL
                           AND highway IN (:walkableHighways)
                         ORDER BY ST_Distance(ST_Transform(geom, :metricSrid), e.entrance_geom)
@@ -109,6 +123,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                     description,
                     node_type,
                     line_id,
+                    line_highway,
                     ST_X(entrance_geom) AS ex,
                     ST_Y(entrance_geom) AS ey,
                     COALESCE(ST_Z(entrance_geom), 0) AS ez,
@@ -140,6 +155,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                         description,
                         node_type,
                         line_id,
+                        line_highway,
                         entrance_geom,
                         line_geom,
                         ST_LineLocatePoint(line_geom, entrance_geom) AS frac,
@@ -157,6 +173,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                         rs.getLong("entrance_id"),
                         rs.getString("description"),
                         rs.getString("node_type"),
+                        rs.getString("line_highway"),
                         rs.getLong("line_id"),
                         rs.getDouble("ex"),
                         rs.getDouble("ey"),
@@ -175,6 +192,14 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
+    /**
+     * 요청 좌표계를 metric 좌표계로 변환한다.
+     *
+     * @param longitude 경도
+     * @param latitude 위도
+     * @param altitude 고도
+     * @return metric 좌표
+     */
     @Override
     public TransformedPointRow transformToMetric(double longitude, double latitude, double altitude) {
         String sql = """
@@ -206,6 +231,14 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
+    /**
+     * 현재 위치 metric 좌표를 가장 가까운 보행로 위의 점으로 투영한다.
+     *
+     * @param x metric x 좌표
+     * @param y metric y 좌표
+     * @param z metric z 좌표
+     * @return 현재 위치 투영 결과
+     */
     @Override
     public CurrentProjectionRow projectCurrentLocationToNearestLine(double x, double y, double z) {
         String sql = """
@@ -237,7 +270,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                     FROM p
                     JOIN LATERAL (
                         SELECT id, geom
-                        FROM raw_schemas_osm.all_lines_split
+                        FROM public.final_edges
                         WHERE geom IS NOT NULL
                           AND highway IN (:walkableHighways)
                         ORDER BY ST_Distance(ST_Transform(geom, :metricSrid), pt)
@@ -274,6 +307,12 @@ public class JdbcNavigationRepository implements NavigationRepository {
         ################################################################################
         ################################################################################
         검증을 위해 추가한 메서드
+     */
+    /**
+     * metric 좌표 목록을 WGS84 좌표 목록으로 변환한다.
+     *
+     * @param metricPoints metric 좌표 목록
+     * @return WGS84 좌표 목록
      */
     @Override
     public List<Wgs84PointRow> transformMetricPointsToWgs84(List<Point3D> metricPoints) {
@@ -323,6 +362,12 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
+    /**
+     * PostGIS JSON 입력으로 넘기기 위해 Point3D 목록을 JSON 문자열로 직렬화한다.
+     *
+     * @param metricPoints metric 좌표 목록
+     * @return JSON 문자열
+     */
     private String toPointsJson(List<Point3D> metricPoints) {
         try {
             List<Map<String, Double>> payload = metricPoints.stream()

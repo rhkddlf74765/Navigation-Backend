@@ -8,6 +8,7 @@ public record EntranceProjectionRow (
         long entranceId,
         String description,
         String nodeType,
+        String lineHighway,
         long lineId,
         double entranceX,
         double entranceY,

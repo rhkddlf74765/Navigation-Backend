@@ -8,11 +8,20 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * 경로 좌표를 지도 표시용 좌표계로 변환하는 서비스이다.
+ */
 @Service
 @RequiredArgsConstructor
 public class CoordinateTransformService {
     private final NavigationRepository navigationRepository;
 
+    /**
+     * RouteResponse의 metric 좌표 목록을 WGS84 위경도 좌표 목록으로 변환한다.
+     *
+     * @param routePoints metric 좌표 경로
+     * @return WGS84 좌표 경로
+     */
     public List<MapPoint> metricRouteToWgs84(List<RoutePoint> routePoints) {
         List<Point3D> metricPoints = routePoints.stream()
                 .map(point -> new Point3D(point.x(), point.y(), point.z()))
