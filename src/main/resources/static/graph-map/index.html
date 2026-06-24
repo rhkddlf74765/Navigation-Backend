@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Graph Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin="">
+    <link rel="stylesheet" href="/graph-map/style.css">
+</head>
+<body>
+<div class="app">
+    <aside class="panel">
+        <div class="panel-header">
+            <h1>Graph Map</h1>
+            <div class="status" id="connectionStatus">Loading</div>
+        </div>
+
+        <div class="controls">
+            <button id="modeStart" class="active">Start</button>
+            <button id="modeDestination">Destination</button>
+            <button id="clearButton">Clear</button>
+            <button id="routeButton" class="primary">Route</button>
+        </div>
+
+        <section class="section">
+            <h2>Selection</h2>
+            <div class="kv"><span>Mode</span><strong id="modeLabel">start</strong></div>
+            <div class="kv"><span>Start</span><strong id="startLabel">-</strong></div>
+            <div class="kv"><span>Destination</span><strong id="destinationLabel">-</strong></div>
+        </section>
+
+        <section class="section">
+            <h2>Projection</h2>
+            <pre id="projectionText">-</pre>
+        </section>
+
+        <section class="section">
+            <h2>Route State</h2>
+            <div class="kv"><span>Status</span><strong id="routeStatus">idle</strong></div>
+            <div class="kv"><span>Visited</span><strong id="visitedCount">0</strong></div>
+            <div class="kv"><span>Frontier</span><strong id="frontierSize">0</strong></div>
+            <div class="kv"><span>Current</span><strong id="currentNode">-</strong></div>
+        </section>
+
+        <section class="section">
+            <h2>Result</h2>
+            <pre id="routeResult">-</pre>
+        </section>
+    </aside>
+
+    <main class="canvas-wrap">
+        <div id="map"></div>
+    </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+<script src="/graph-map/app.js"></script>
+</body>
+</html>

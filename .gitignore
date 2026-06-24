@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local test secrets ###
+src/test/resources/dev-db-test.local.properties

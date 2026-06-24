@@ -17,9 +17,23 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class CampusGraph {
 
+    /**
+     * 그래프의 모든 노드를 저장한다.
+     */
     private final Map<Long, GraphNode> nodes;
+    /**
+     * 각 노드에서 이동 가능한 엣지 목록
+     * key: 출발 node Id
+     * value: 출발 노드에서 나가는 GraphEdge 목록
+     */
     private final Map<Long, List<GraphEdge>> adjacency;
+    /**
+     * DB에서 읽은 라인 ID와, 그 라인이 그래프에서 어떤 시작/끝 노드로 변환됐는지 저장한다.
+     */
     private final Map<Long, LineEndpoints> lineEndpointsByLineId;
+    /**
+     * 건물명과 입구 노드 ID 목록을 매핑한다.
+     */
     private final Map<String, List<Long>> buildingToEntranceNodeIds;
     /**
      * -- GETTER --
@@ -189,6 +203,40 @@ public class CampusGraph {
          * @param buildingName 출입구가 속한 건물명
          * @return 생성된 출입구 노드 ID
          */
+        public Long findMatchingBaseNodeId(Point3D point, double toleranceMeters) {
+            long bestNodeId = -1L;
+            double bestDistance = Double.POSITIVE_INFINITY;
+
+            for (GraphNode node : nodes.values()) {
+                if (node.type() != GraphNodeType.BASE) {
+                    continue;
+                }
+
+                double distance = point.distance2D(node.point());
+                if (distance <= toleranceMeters && distance < bestDistance) {
+                    bestDistance = distance;
+                    bestNodeId = node.id();
+                }
+            }
+
+            return bestNodeId == -1L ? null : bestNodeId;
+        }
+
+        public void addNode(long nodeId, GraphNodeType type, long sourceId, Point3D point) {
+            GraphNode node = new GraphNode(nodeId, type, sourceId, point);
+            nodes.put(nodeId, node);
+            adjacency.putIfAbsent(nodeId, new ArrayList<>());
+            if (type != GraphNodeType.PROJECTION) {
+                startCandidateNodeIds.add(nodeId);
+                baseNodeIndex.put(NodeKey.from(point), nodeId);
+            }
+            nodeSequence.updateAndGet(current -> Math.max(current, nodeId + 1));
+        }
+
+        public GraphNode getNode(long nodeId) {
+            return nodes.get(nodeId);
+        }
+
         public long createEntranceNode(Point3D point, long entranceId, String buildingName) {
             long nodeId = nodeSequence.getAndIncrement();
             GraphNode node = new GraphNode(nodeId, GraphNodeType.ENTRANCE, entranceId, point);

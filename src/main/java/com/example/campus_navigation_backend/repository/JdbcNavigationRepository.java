@@ -3,7 +3,9 @@ package com.example.campus_navigation_backend.repository;
 import com.example.campus_navigation_backend.config.NavigationProperties;
 import com.example.campus_navigation_backend.domain.graph.Point3D;
 import com.example.campus_navigation_backend.repository.dto.CurrentProjectionRow;
-import com.example.campus_navigation_backend.repository.dto.EntranceProjectionRow;
+import com.example.campus_navigation_backend.repository.dto.EntranceRow;
+import com.example.campus_navigation_backend.repository.dto.GraphEdgeRow;
+import com.example.campus_navigation_backend.repository.dto.GraphNodeRow;
 import com.example.campus_navigation_backend.repository.dto.LineSegmentRow;
 import com.example.campus_navigation_backend.repository.dto.TransformedPointRow;
 import com.example.campus_navigation_backend.support.GeoJsonGeometryParser;
@@ -18,9 +20,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 
-/**
- * NamedParameterJdbcTemplate으로 PostGIS SQL을 실행하는 NavigationRepository 구현체이다.
- */
 @Repository
 @RequiredArgsConstructor
 public class JdbcNavigationRepository implements NavigationRepository {
@@ -28,18 +27,77 @@ public class JdbcNavigationRepository implements NavigationRepository {
     private final NamedParameterJdbcTemplate jdbc;
     private final NavigationProperties properties;
     private final GeoJsonGeometryParser geoJsonGeometryParser;
-
-    /*
-        검증을 위해 추가한 필드
-     */
     private final ObjectMapper objectMapper;
 
+    @Override
+    public List<GraphNodeRow> findAllGraphNodes() {
+        String sql = """
+                SELECT
+                    id,
+                    node_type,
+                    description,
+                    ST_X(mgeom) AS x,
+                    ST_Y(mgeom) AS y,
+                    COALESCE(ST_Z(mgeom), 0) AS z
+                FROM (
+                    SELECT
+                        id,
+                        node_type,
+                        description,
+                        ST_Transform(geom, :metricSrid) AS mgeom
+                    FROM public.final_nodes_3d
+                    WHERE geom IS NOT NULL
+                ) t
+                ORDER BY id
+                """;
 
-    /**
-     * 보행 가능한 OSM highway 선분을 metric 좌표계로 변환해 조회한다.
-     *
-     * @return 그래프 base edge 생성에 사용할 도로 선분 목록
-     */
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("metricSrid", properties.metricSrid());
+
+        return jdbc.query(sql, params, (rs, rowNum) ->
+                new GraphNodeRow(
+                        rs.getLong("id"),
+                        rs.getString("node_type"),
+                        rs.getString("description"),
+                        rs.getDouble("x"),
+                        rs.getDouble("y"),
+                        rs.getDouble("z")
+                )
+        );
+    }
+
+    @Override
+    public List<GraphEdgeRow> findAllGraphEdges() {
+        String sql = """
+                SELECT
+                    id,
+                    original_edge_id,
+                    highway,
+                    source,
+                    target,
+                    cost,
+                    ST_AsGeoJSON(ST_Transform(geom, :metricSrid)) AS geom_json
+                FROM public.final_edges_split_3d
+                WHERE geom IS NOT NULL
+                ORDER BY id
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("metricSrid", properties.metricSrid());
+
+        return jdbc.query(sql, params, (rs, rowNum) ->
+                new GraphEdgeRow(
+                        rs.getLong("id"),
+                        rs.getLong("original_edge_id"),
+                        rs.getString("highway"),
+                        rs.getLong("source"),
+                        rs.getLong("target"),
+                        rs.getDouble("cost"),
+                        geoJsonGeometryParser.parseLineString(rs.getString("geom_json"))
+                )
+        );
+    }
+
     @Override
     public List<LineSegmentRow> findAllWalkableLineSegments() {
         String sql = """
@@ -56,7 +114,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                     ST_AsGeoJSON(mgeom) AS geom_json
                 FROM (
                     SELECT id, highway, ST_Transform(geom, :metricSrid) AS mgeom
-                    FROM public.final_edges
+                    FROM public.final_edges_3d
                     WHERE geom IS NOT NULL
                       AND highway IN (:walkableHighways)
                 ) t
@@ -82,124 +140,38 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
-    /**
-     * 각 출입구를 가장 가까운 보행로에 투영하고 connector 및 분할 선분 정보를 조회한다.
-     *
-     * @return 출입구와 보행로 투영 정보 목록
-     */
     @Override
-    public List<EntranceProjectionRow> findAllEntranceProjections() {
+    public List<EntranceRow> findAllEntrances() {
         String sql = """
-                WITH entrances AS (
-                    SELECT
-                        id,
-                        description,
-                        node_type,
-                        ST_Transform(geom_3d, :metricSrid) AS entrance_geom
-                    FROM public.entrances
-                    WHERE geom_3d IS NOT NULL
-                ),
-                matched AS (
-                    SELECT
-                        e.id AS entrance_id,
-                        e.description,
-                        e.node_type,
-                        e.entrance_geom,
-                        l.id AS line_id,
-                        l.highway AS line_highway,
-                        ST_Transform(l.geom, :metricSrid) AS line_geom
-                    FROM entrances e
-                    JOIN LATERAL (
-                        SELECT id, geom, highway
-                        FROM public.final_edges
-                        WHERE geom IS NOT NULL
-                          AND highway IN (:walkableHighways)
-                        ORDER BY ST_Distance(ST_Transform(geom, :metricSrid), e.entrance_geom)
-                        LIMIT 1
-                    ) l ON TRUE
-                )
                 SELECT
-                    entrance_id,
+                    id,
                     description,
                     node_type,
-                    line_id,
-                    line_highway,
-                    ST_X(entrance_geom) AS ex,
-                    ST_Y(entrance_geom) AS ey,
-                    COALESCE(ST_Z(entrance_geom), 0) AS ez,
-                    frac,
-                    ST_X(proj_geom) AS px,
-                    ST_Y(proj_geom) AS py,
-                    COALESCE(ST_Z(proj_geom), 0) AS pz,
-                    ST_Distance(entrance_geom, proj_geom) AS connector_cost,
-                
-                    -- 비용(Length) 계산 시에도 안전하게 CASE 처리를 해주는 것이 좋습니다.
-                    CASE WHEN frac <= 1e-9 THEN 0 ELSE ST_Length(ST_LineSubstring(line_geom, 0, frac)) END AS left_cost,
-                    CASE WHEN frac >= 1.0 - 1e-9 THEN 0 ELSE ST_Length(ST_LineSubstring(line_geom, frac, 1)) END AS right_cost,
-                
-                    ST_AsGeoJSON(ST_MakeLine(entrance_geom, proj_geom)) AS connector_geom_json,
-                
-                    -- [요청하신 코드 삽입 위치]
-                    CASE
-                        WHEN frac <= 1e-9 THEN NULL
-                        ELSE ST_AsGeoJSON(ST_LineSubstring(line_geom, 0, frac))
-                    END AS left_geom_json,
-                
-                    CASE
-                        WHEN frac >= 1.0 - 1e-9 THEN NULL
-                        ELSE ST_AsGeoJSON(ST_LineSubstring(line_geom, frac, 1))
-                    END AS right_geom_json
+                    ST_X(mgeom) AS x,
+                    ST_Y(mgeom) AS y,
+                    COALESCE(ST_Z(mgeom), 0) AS z
                 FROM (
-                    SELECT
-                        entrance_id,
-                        description,
-                        node_type,
-                        line_id,
-                        line_highway,
-                        entrance_geom,
-                        line_geom,
-                        ST_LineLocatePoint(line_geom, entrance_geom) AS frac,
-                        ST_LineInterpolatePoint(line_geom, ST_LineLocatePoint(line_geom, entrance_geom)) AS proj_geom
-                    FROM matched
-                ) x;
+                    SELECT id, description, node_type, ST_Transform(geom, :metricSrid) AS mgeom
+                    FROM public.entrances
+                    WHERE geom IS NOT NULL
+                ) t
                 """;
 
         MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("metricSrid", properties.metricSrid())
-                .addValue("walkableHighways", properties.walkableHighways());
+                .addValue("metricSrid", properties.metricSrid());
 
         return jdbc.query(sql, params, (rs, rowNum) ->
-                new EntranceProjectionRow(
-                        rs.getLong("entrance_id"),
+                new EntranceRow(
+                        rs.getLong("id"),
                         rs.getString("description"),
                         rs.getString("node_type"),
-                        rs.getString("line_highway"),
-                        rs.getLong("line_id"),
-                        rs.getDouble("ex"),
-                        rs.getDouble("ey"),
-                        rs.getDouble("ez"),
-                        rs.getDouble("frac"),
-                        rs.getDouble("px"),
-                        rs.getDouble("py"),
-                        rs.getDouble("pz"),
-                        rs.getDouble("connector_cost"),
-                        rs.getDouble("left_cost"),
-                        rs.getDouble("right_cost"),
-                        geoJsonGeometryParser.parseGeometry(rs.getString("connector_geom_json")),
-                        geoJsonGeometryParser.parseGeometry(rs.getString("left_geom_json")),
-                        geoJsonGeometryParser.parseGeometry(rs.getString("right_geom_json"))
+                        rs.getDouble("x"),
+                        rs.getDouble("y"),
+                        rs.getDouble("z")
                 )
         );
     }
 
-    /**
-     * 요청 좌표계를 metric 좌표계로 변환한다.
-     *
-     * @param longitude 경도
-     * @param latitude 위도
-     * @param altitude 고도
-     * @return metric 좌표
-     */
     @Override
     public TransformedPointRow transformToMetric(double longitude, double latitude, double altitude) {
         String sql = """
@@ -231,14 +203,6 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
-    /**
-     * 현재 위치 metric 좌표를 가장 가까운 보행로 위의 점으로 투영한다.
-     *
-     * @param x metric x 좌표
-     * @param y metric y 좌표
-     * @param z metric z 좌표
-     * @return 현재 위치 투영 결과
-     */
     @Override
     public CurrentProjectionRow projectCurrentLocationToNearestLine(double x, double y, double z) {
         String sql = """
@@ -270,7 +234,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
                     FROM p
                     JOIN LATERAL (
                         SELECT id, geom
-                        FROM public.final_edges
+                        FROM public.final_edges_3d
                         WHERE geom IS NOT NULL
                           AND highway IN (:walkableHighways)
                         ORDER BY ST_Distance(ST_Transform(geom, :metricSrid), pt)
@@ -303,17 +267,6 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
-    /*
-        ################################################################################
-        ################################################################################
-        검증을 위해 추가한 메서드
-     */
-    /**
-     * metric 좌표 목록을 WGS84 좌표 목록으로 변환한다.
-     *
-     * @param metricPoints metric 좌표 목록
-     * @return WGS84 좌표 목록
-     */
     @Override
     public List<Wgs84PointRow> transformMetricPointsToWgs84(List<Point3D> metricPoints) {
         if (metricPoints == null || metricPoints.isEmpty()) {
@@ -362,12 +315,6 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
-    /**
-     * PostGIS JSON 입력으로 넘기기 위해 Point3D 목록을 JSON 문자열로 직렬화한다.
-     *
-     * @param metricPoints metric 좌표 목록
-     * @return JSON 문자열
-     */
     private String toPointsJson(List<Point3D> metricPoints) {
         try {
             List<Map<String, Double>> payload = metricPoints.stream()
@@ -380,12 +327,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
 
             return objectMapper.writeValueAsString(payload);
         } catch (JacksonException e) {
-            throw new IllegalStateException("경로 좌표를 JSON으로 직렬화하는 데 실패했습니다.", e);
+            throw new IllegalStateException("Failed to serialize route points to JSON.", e);
         }
     }
-    /*
-        ################################################################################
-        ################################################################################
-     */
-
 }

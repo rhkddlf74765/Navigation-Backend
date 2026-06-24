@@ -5,6 +5,8 @@ import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
 import com.example.campus_navigation_backend.visualizer.GraphMapFacade;
 import com.example.campus_navigation_backend.visualizer.GraphMapResponse;
+import com.example.campus_navigation_backend.visualizer.ProjectionMapRequest;
+import com.example.campus_navigation_backend.visualizer.ProjectionMapResponse;
 import com.example.campus_navigation_backend.visualizer.RouteMapFacade;
 import com.example.campus_navigation_backend.visualizer.RouteMapResponse;
 import jakarta.validation.Valid;
@@ -70,4 +72,16 @@ public class NavigationController {
     public ResponseEntity<GraphMapResponse> getGraphForMap() {
         return ResponseEntity.ok(graphMapFacade.getGraphForMap());
     }
+
+    /**
+     * 지도에서 선택한 좌표를 가장 가까운 그래프 엣지 위로 투영한 결과를 반환한다.
+     *
+     * @param request projection 요청 좌표
+     * @return 지도 표시용 projection 결과
+     */
+    @PostMapping("/projection-map")
+    public ResponseEntity<ProjectionMapResponse> projectPointForMap(@Valid @RequestBody ProjectionMapRequest request) {
+        return ResponseEntity.ok(graphMapFacade.projectPointForMap(request));
+    }
+
 }

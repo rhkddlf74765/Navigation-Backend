@@ -4,6 +4,8 @@ import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
 import com.example.campus_navigation_backend.domain.graph.GraphEdge;
 import com.example.campus_navigation_backend.domain.graph.GraphNode;
 import com.example.campus_navigation_backend.domain.graph.Point3D;
+import com.example.campus_navigation_backend.domain.projection.PointProjection;
+import com.example.campus_navigation_backend.domain.projection.PointProjector;
 import com.example.campus_navigation_backend.repository.NavigationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ public class GraphMapFacade {
 
     private final CampusGraphStore campusGraphStore;
     private final NavigationRepository navigationRepository;
+    private final PointProjector pointProjector;
 
     /**
      * CampusGraph의 모든 노드와 엣지를 지도 렌더링용 응답으로 만든다.
@@ -70,6 +73,40 @@ public class GraphMapFacade {
         }
 
         return new GraphMapResponse(nodes, edges);
+    }
+
+    /**
+     * 지도에서 클릭한 좌표를 가장 가까운 그래프 엣지 위로 투영한다.
+     *
+     * @param request 클릭 좌표 요청
+     * @return 지도에 표시할 projection 결과
+     */
+    public ProjectionMapResponse projectPointForMap(ProjectionMapRequest request) {
+        Point3D metricPoint = navigationRepository
+                .transformToMetric(request.longitude(), request.latitude(), request.resolvedAltitude())
+                .toPoint3D();
+
+        PointProjection projection = campusGraphStore.getEdges().stream()
+                .filter(edge -> edge.geometry() != null && edge.geometry().size() >= 2)
+                .map(edge -> pointProjector.project(metricPoint, edge))
+                .min((left, right) -> Double.compare(left.distanceFromSource(), right.distanceFromSource()))
+                .orElseThrow(() -> new IllegalStateException("No graph edge available for projection."));
+
+        List<MapPoint> sourceAndProjected = transform(List.of(metricPoint, projection.projectedPoint()));
+        List<MapPoint> edgePath = transform(projection.sourceEdge().geometry());
+
+        return new ProjectionMapResponse(
+                sourceAndProjected.get(0),
+                sourceAndProjected.get(1),
+                projection.sourceEdge().fromNodeId(),
+                projection.sourceEdge().toNodeId(),
+                projection.sourceEdge().edgeType(),
+                projection.sourceEdge().cost(),
+                projection.distanceFromSource(),
+                projection.costFromEdgeStart(),
+                projection.costToEdgeEnd(),
+                edgePath
+        );
     }
 
     /**

@@ -35,14 +35,21 @@ public class AStarPathFinder {
         Map<Long, Double> gScore = new HashMap<>();
         Map<Long, Long> cameFromNode = new HashMap<>();
         Map<Long, GraphEdge> cameFromEdge = new HashMap<>();
+        int visitedCount = 0;
 
         gScore.put(startNodeId, 0.0);
         open.add(new SearchState(startNodeId, heuristic(startNodeId, goalNodeId)));
 
         while (!open.isEmpty()) {
             SearchState current = open.poll();
+            visitedCount++;
 
             if (current.nodeId() == goalNodeId) {
+                System.out.println(
+                        "A* reached goal. start=" + startNodeId
+                                + ", goal=" + goalNodeId
+                                + ", visited=" + visitedCount
+                );
                 return reconstructPath(startNodeId, goalNodeId, cameFromNode, cameFromEdge, gScore.get(goalNodeId));
             }
 
@@ -60,6 +67,11 @@ public class AStarPathFinder {
             }
         }
 
+        System.out.println(
+                "A* unreachable. start=" + startNodeId
+                        + ", goal=" + goalNodeId
+                        + ", visited=" + visitedCount
+        );
         return PathResult.unreachable();
     }
 

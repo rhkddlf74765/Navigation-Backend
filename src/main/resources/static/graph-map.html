@@ -74,6 +74,7 @@
 
     const edgeLayer = L.layerGroup().addTo(map);
     const nodeLayer = L.layerGroup().addTo(map);
+    const projectionLayer = L.layerGroup().addTo(map);
     const statusElement = document.getElementById('status');
     const edgeToggle = document.getElementById('edgeToggle');
     const nodeToggle = document.getElementById('nodeToggle');
@@ -113,6 +114,52 @@
             return { radius: 3, color: '#a855f7', fillColor: '#c084fc', fillOpacity: 0.8, weight: 1 };
         }
         return { radius: 2, color: '#0f766e', fillColor: '#14b8a6', fillOpacity: 0.75, weight: 1 };
+    }
+
+    function drawProjection(result) {
+        projectionLayer.clearLayers();
+
+        const sourceLatLng = toLatLng(result.sourcePoint);
+        const projectedLatLng = toLatLng(result.projectedPoint);
+        const edgePath = result.edgePath.map(toLatLng);
+
+        L.polyline(edgePath, {
+            color: '#111827',
+            weight: 8,
+            opacity: 0.82
+        }).addTo(projectionLayer);
+
+        L.polyline([sourceLatLng, projectedLatLng], {
+            color: '#f97316',
+            weight: 4,
+            opacity: 0.95,
+            dashArray: '6 6'
+        }).addTo(projectionLayer);
+
+        L.circleMarker(sourceLatLng, {
+            radius: 7,
+            color: '#ea580c',
+            fillColor: '#fb923c',
+            fillOpacity: 0.95,
+            weight: 2
+        }).bindPopup('clicked point').addTo(projectionLayer);
+
+        L.circleMarker(projectedLatLng, {
+            radius: 7,
+            color: '#0f172a',
+            fillColor: '#facc15',
+            fillOpacity: 0.95,
+            weight: 2
+        }).bindPopup(
+            `projected point<br>` +
+            `edge: ${result.fromNodeId} -> ${result.toNodeId}<br>` +
+            `type: ${result.edgeType}<br>` +
+            `distance: ${result.distanceFromSource.toFixed(2)}m<br>` +
+            `from-start cost: ${result.costFromEdgeStart.toFixed(2)}<br>` +
+            `to-end cost: ${result.costToEdgeEnd.toFixed(2)}`
+        ).addTo(projectionLayer);
+
+        statusElement.textContent = `Projection distance ${result.distanceFromSource.toFixed(2)}m`;
     }
 
     function drawGraph(graph) {
@@ -159,6 +206,26 @@
         drawGraph(await response.json());
     }
 
+    async function projectPoint(latLng) {
+        statusElement.textContent = 'Projecting point...';
+
+        const response = await fetch('/api/navigation/projection-map', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                latitude: latLng.lat,
+                longitude: latLng.lng,
+                altitude: 0
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Projection API failed: ${response.status}`);
+        }
+
+        drawProjection(await response.json());
+    }
+
     edgeToggle.addEventListener('change', () => {
         if (edgeToggle.checked) {
             edgeLayer.addTo(map);
@@ -177,6 +244,12 @@
 
     reloadButton.addEventListener('click', () => {
         loadGraph().catch(error => {
+            statusElement.textContent = error.message;
+        });
+    });
+
+    map.on('click', event => {
+        projectPoint(event.latlng).catch(error => {
             statusElement.textContent = error.message;
         });
     });
