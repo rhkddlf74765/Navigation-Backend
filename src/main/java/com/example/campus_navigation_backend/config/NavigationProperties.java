@@ -9,6 +9,6 @@ public record NavigationProperties(
     int requestSrid,
     int metricSrid,
     double candidateRadiusMeters,
-    int maxStartCandidates,
+    int maxCandidates,
     List<String> walkableHighways
 ) { }
