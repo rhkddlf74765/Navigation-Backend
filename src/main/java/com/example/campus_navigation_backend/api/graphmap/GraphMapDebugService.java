@@ -420,7 +420,7 @@ public class GraphMapDebugService {
         }
 
         GraphMapRouteResultResponse toResponse() {
-            return new GraphMapRouteResultResponse(found, totalCost, pathNodeIds, steps);
+            return new GraphMapRouteResultResponse(found, totalCost, List.of());
         }
     }
 
@@ -476,13 +476,6 @@ public class GraphMapDebugService {
             return new GraphMapRouteSessionResponse(
                     sessionId,
                     status,
-                    startProjection,
-                    destinationProjection,
-                    visitedCount,
-                    frontierSize,
-                    currentNodeId,
-                    List.copyOf(visitedNodeIds),
-                    List.copyOf(frontierNodeIds),
                     message,
                     result
             );

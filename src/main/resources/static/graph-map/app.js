@@ -62,27 +62,19 @@ function renderGraph() {
     graphLayer.clearLayers();
     routeLayer.clearLayers();
 
-    const visited = new Set(state.session?.visitedNodeIds || []);
-    const frontier = new Set(state.session?.frontierNodeIds || []);
-    const routePath = state.session?.result?.pathNodeIds || [];
-    const routeEdges = new Set();
-    for (let i = 0; i < routePath.length - 1; i++) {
-        routeEdges.add(makeEdgeKey(routePath[i], routePath[i + 1]));
-    }
+    const routePath = state.session?.result?.path || [];
 
     for (const edge of state.graph.edges) {
         const latlngs = edge.geometry.map(point => toLatLng(point));
-        const isRoute = routeEdges.has(makeEdgeKey(edge.fromNodeId, edge.toNodeId));
         const color =
-            isRoute ? '#f59e0b' :
             edge.highway === 'steps' ? '#ef4444' :
             edge.highway === 'ramp' ? '#22c55e' :
             '#7c3aed';
 
         const polyline = L.polyline(latlngs, {
             color,
-            weight: isRoute ? 5 : 2,
-            opacity: isRoute ? 1 : 0.7
+            weight: 2,
+            opacity: 0.7
         }).addTo(graphLayer);
 
         polyline.bindTooltip(`edge ${edge.fromNodeId} -> ${edge.toNodeId}<br>${edge.highway}<br>cost=${edge.cost.toFixed(2)}`, {
@@ -91,11 +83,7 @@ function renderGraph() {
     }
 
     for (const node of state.graph.nodes) {
-        const isVisited = visited.has(node.id);
-        const isFrontier = frontier.has(node.id);
         const color =
-            isVisited ? '#22c55e' :
-            isFrontier ? '#60a5fa' :
             node.nodeType === 'ENTRANCE' ? '#f97316' :
             '#000000';
 
@@ -112,48 +100,11 @@ function renderGraph() {
     }
 
     if (routePath.length > 1) {
-        for (let i = 0; i < routePath.length - 1; i++) {
-            const fromId = routePath[i];
-            const toId = routePath[i + 1];
-            const edge = state.edgeByKey.get(makeEdgeKey(fromId, toId)) || state.edgeByKey.get(makeEdgeKey(toId, fromId));
-            if (!edge) {
-                const fromNode = state.nodeById.get(fromId);
-                const toNode = state.nodeById.get(toId);
-                if (fromNode && toNode) {
-                    L.polyline([
-                        [fromNode.latitude, fromNode.longitude],
-                        [toNode.latitude, toNode.longitude]
-                    ], {color: '#f59e0b', weight: 5, opacity: 0.95}).addTo(routeLayer);
-                }
-                continue;
-            }
-
-            L.polyline(edge.geometry.map(point => toLatLng(point)), {
-                color: '#f59e0b',
-                weight: 5,
-                opacity: 0.95
-            }).addTo(routeLayer);
-        }
-    }
-
-    if (routePath.length > 0 && state.startSelection) {
-        const firstNode = state.nodeById.get(routePath[0]);
-        if (firstNode) {
-            L.polyline([
-                toLatLng(state.startSelection.projectedPoint),
-                [firstNode.latitude, firstNode.longitude]
-            ], {color: '#f59e0b', weight: 4, opacity: 0.95, dashArray: '8 5'}).addTo(routeLayer);
-        }
-    }
-
-    if (routePath.length > 0 && state.destinationSelection) {
-        const lastNode = state.nodeById.get(routePath[routePath.length - 1]);
-        if (lastNode) {
-            L.polyline([
-                [lastNode.latitude, lastNode.longitude],
-                toLatLng(state.destinationSelection.projectedPoint)
-            ], {color: '#f59e0b', weight: 4, opacity: 0.95, dashArray: '8 5'}).addTo(routeLayer);
-        }
+        L.polyline(routePath.map(point => toLatLng(point)), {
+            color: '#f59e0b',
+            weight: 5,
+            opacity: 0.95
+        }).addTo(routeLayer);
     }
 }
 
@@ -269,11 +220,18 @@ async function startRoute() {
     state.sessionId = state.session.sessionId;
 
     document.getElementById('routeStatus').textContent = state.session.status;
-    document.getElementById('routeResult').textContent = state.session.message ?? '-';
+    document.getElementById('visitedCount').textContent = '-';
+    document.getElementById('frontierSize').textContent = '-';
+    document.getElementById('currentNode').textContent = '-';
+    document.getElementById('routeResult').textContent = state.session.result
+        ? JSON.stringify(state.session.result, null, 2)
+        : state.session.message ?? '-';
 
-    pollSession();
-    if (state.pollTimer) clearInterval(state.pollTimer);
-    state.pollTimer = setInterval(pollSession, 500);
+    if (state.pollTimer) {
+        clearInterval(state.pollTimer);
+        state.pollTimer = null;
+    }
+    renderGraph();
 }
 
 async function pollSession() {
@@ -282,9 +240,9 @@ async function pollSession() {
     state.session = await response.json();
 
     document.getElementById('routeStatus').textContent = state.session.status;
-    document.getElementById('visitedCount').textContent = state.session.visitedCount;
-    document.getElementById('frontierSize').textContent = state.session.frontierSize;
-    document.getElementById('currentNode').textContent = state.session.currentNodeId ?? '-';
+    document.getElementById('visitedCount').textContent = '-';
+    document.getElementById('frontierSize').textContent = '-';
+    document.getElementById('currentNode').textContent = '-';
     document.getElementById('routeResult').textContent = state.session.result
         ? JSON.stringify(state.session.result, null, 2)
         : state.session.message;

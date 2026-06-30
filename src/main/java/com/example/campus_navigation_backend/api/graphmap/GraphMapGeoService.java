@@ -1,6 +1,10 @@
 package com.example.campus_navigation_backend.api.graphmap;
 
 import com.example.campus_navigation_backend.api.graphmap.dto.*;
+import com.example.campus_navigation_backend.application.CampusNavigationFacade;
+import com.example.campus_navigation_backend.application.dto.RoutePoint;
+import com.example.campus_navigation_backend.application.dto.RouteRequest;
+import com.example.campus_navigation_backend.application.dto.RouteResponse;
 import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
 import com.example.campus_navigation_backend.domain.graph.GraphEdge;
 import com.example.campus_navigation_backend.domain.graph.GraphNode;
@@ -14,6 +18,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Geographic facade for the graph-map screen.
@@ -25,6 +31,8 @@ public class GraphMapGeoService {
     private final NavigationRepository navigationRepository;
     private final CampusGraphStore campusGraphStore;
     private final GraphMapDebugService graphMapDebugService;
+    private final CampusNavigationFacade campusNavigationFacade;
+    private final Map<UUID, GraphMapRouteSessionResponse> routeSessions = new ConcurrentHashMap<>();
 
     public GraphMapGeoGraphResponse loadGraph() {
         List<GraphNode> nodes = campusGraphStore.getNodes();
@@ -91,26 +99,50 @@ public class GraphMapGeoService {
     }
 
     public GraphMapRouteSessionResponse startRoute(GraphMapGeoRouteStartRequest request) {
-        Point3D startMetric = navigationRepository.transformToMetric(
-                request.startPoint().longitude(),
-                request.startPoint().latitude(),
-                request.startPoint().altitude() == null ? 0.0 : request.startPoint().altitude()
-        ).toPoint3D();
-        Point3D destinationMetric = navigationRepository.transformToMetric(
-                request.destinationPoint().longitude(),
-                request.destinationPoint().latitude(),
-                request.destinationPoint().altitude() == null ? 0.0 : request.destinationPoint().altitude()
-        ).toPoint3D();
-
-        return graphMapDebugService.startRoute(
-                new GraphMapRouteStartRequest(
-                        new GraphMapPointRequest(startMetric.x(), startMetric.y(), startMetric.z()),
-                        new GraphMapPointRequest(destinationMetric.x(), destinationMetric.y(), destinationMetric.z())
+        RouteResponse routeResponse = campusNavigationFacade.findRoute(
+                new RouteRequest(
+                        request.startPoint().longitude(),
+                        request.startPoint().latitude(),
+                        request.startPoint().altitude(),
+                        null,
+                        request.destinationPoint().longitude(),
+                        request.destinationPoint().latitude(),
+                        request.destinationPoint().altitude()
                 )
         );
+
+        List<GraphMapGeoPointResponse> path = toGeoPath(routeResponse.path());
+        GraphMapRouteResultResponse result = new GraphMapRouteResultResponse(
+                true,
+                routeResponse.totalDistanceMeters(),
+                path
+        );
+
+        UUID sessionId = UUID.randomUUID();
+        GraphMapRouteSessionResponse session = new GraphMapRouteSessionResponse(
+                sessionId,
+                GraphMapRouteSearchStatus.COMPLETED,
+                "Route search completed.",
+                result
+        );
+        routeSessions.put(sessionId, session);
+        return session;
     }
 
     public GraphMapRouteSessionResponse getSession(java.util.UUID sessionId) {
+        GraphMapRouteSessionResponse session = routeSessions.get(sessionId);
+        if (session != null) {
+            return session;
+        }
         return graphMapDebugService.getSession(sessionId);
+    }
+
+    private List<GraphMapGeoPointResponse> toGeoPath(List<RoutePoint> routePoints) {
+        List<Point3D> metricPoints = routePoints.stream()
+                .map(point -> new Point3D(point.x(), point.y(), point.z()))
+                .toList();
+        return navigationRepository.transformMetricPointsToWgs84(metricPoints).stream()
+                .map(row -> new GraphMapGeoPointResponse(row.longitude(), row.latitude(), row.altitude()))
+                .toList();
     }
 }

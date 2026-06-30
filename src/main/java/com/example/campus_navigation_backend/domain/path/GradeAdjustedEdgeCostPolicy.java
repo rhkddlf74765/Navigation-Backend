@@ -11,8 +11,9 @@ import org.springframework.stereotype.Component;
 public class GradeAdjustedEdgeCostPolicy implements EdgeCostPolicy {
 
     private static final double EPS = 1e-6;
-    private static final double STEPS_UP_MULTIPLIER = 1.8;
-    private static final double STEPS_DOWN_MULTIPLIER = 1.2;
+    private static final double STEPS_BASE_MULTIPLIER = 3.0;
+    private static final double STEPS_UPHILL_GRADE_WEIGHT = 18.0;
+    private static final double STEPS_DOWNHILL_GRADE_WEIGHT = 10.0;
     private static final double RAMP_UPHILL_GRADE_WEIGHT = 8.0;
     private static final double RAMP_DOWNHILL_GRADE_WEIGHT = 3.0;
     private static final double ROAD_UPHILL_GRADE_WEIGHT = 5.0;
@@ -36,15 +37,17 @@ public class GradeAdjustedEdgeCostPolicy implements EdgeCostPolicy {
     }
 
     private double calculateStepsCost(double baseCost, double elevationDelta) {
+        double grade = Math.abs(elevationDelta / baseCost);
+
         if (elevationDelta > EPS) {
-            return baseCost * STEPS_UP_MULTIPLIER;
+            return baseCost * (STEPS_BASE_MULTIPLIER + grade * STEPS_UPHILL_GRADE_WEIGHT);
         }
 
         if (elevationDelta < -EPS) {
-            return baseCost * STEPS_DOWN_MULTIPLIER;
+            return baseCost * (STEPS_BASE_MULTIPLIER + grade * STEPS_DOWNHILL_GRADE_WEIGHT);
         }
 
-        return baseCost;
+        return baseCost * STEPS_BASE_MULTIPLIER;
     }
 
     private double calculateSlopeCost(double baseCost,
