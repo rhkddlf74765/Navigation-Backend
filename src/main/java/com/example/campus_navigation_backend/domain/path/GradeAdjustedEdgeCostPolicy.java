@@ -4,7 +4,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 /**
- * Edge cost policy that adjusts base cost by uphill/downhill grade and stairs.
+ * 오르막/내리막 경사도와 계단 여부에 따라 기본 비용을 보정하는 엣지 비용 정책이다.
  */
 @Primary
 @Component

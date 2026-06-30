@@ -2,6 +2,7 @@ package com.example.campus_navigation_backend.application;
 
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
+import com.example.campus_navigation_backend.application.routing.CampusNavigationFacade;
 import com.example.campus_navigation_backend.support.DevDatabaseIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,3 +51,5 @@ class CampusNavigationFacadeDevDataIntegrationTest extends DevDatabaseIntegratio
         assertThat(response.path()).isNotEmpty();
     }
 }
+
+

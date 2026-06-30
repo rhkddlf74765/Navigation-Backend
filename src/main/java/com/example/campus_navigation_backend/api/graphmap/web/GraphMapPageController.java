@@ -4,7 +4,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * Serves the graph-map viewer page.
+ * 그래프 지도 뷰어 페이지를 제공한다.
  */
 @Controller
 public class GraphMapPageController {

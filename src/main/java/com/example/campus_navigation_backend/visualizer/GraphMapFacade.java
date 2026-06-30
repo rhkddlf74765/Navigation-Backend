@@ -29,7 +29,7 @@ public class GraphMapFacade {
     private final PointProjector pointProjector;
 
     /**
-     * CampusGraph의 모든 노드와 엣지를 지도 렌더링용 응답으로 만든다.
+     * 캠퍼스 그래프의 모든 노드와 엣지를 지도 렌더링용 응답으로 만든다.
      *
      * @return 그래프 지도 응답
      */
@@ -153,7 +153,7 @@ public class GraphMapFacade {
     }
 
     /**
-     * metric 좌표 목록을 WGS84 MapPoint 목록으로 변환한다.
+     * 미터 단위 좌표 목록을 WGS84 지도 지점 목록으로 변환한다.
      *
      * @param points metric 좌표 목록
      * @return WGS84 좌표 목록

@@ -1,18 +1,18 @@
 package com.example.campus_navigation_backend.domain.path;
 
 /**
- * Strategy for calculating edge traversal cost.
+ * 엣지 통행 비용을 계산하는 전략 인터페이스이다.
  */
 public interface EdgeCostPolicy {
 
     /**
-     * Calculates edge cost with the policy-specific adjustment.
+     * 정책별 보정 규칙을 적용해 엣지 비용을 계산한다.
      *
-     * @param edgeType edge type
-     * @param highway OSM highway value
-     * @param baseCost base geometric cost
-     * @param elevationDelta elevation difference along travel direction
-     * @return adjusted traversal cost
+     * @param edgeType 엣지 유형
+     * @param highway OSM highway 값
+     * @param baseCost 기본 geometry 비용
+     * @param elevationDelta 이동 방향 기준 고도 차이
+     * @return 보정된 통행 비용
      */
     double calculate(String edgeType, String highway, double baseCost, double elevationDelta);
 }

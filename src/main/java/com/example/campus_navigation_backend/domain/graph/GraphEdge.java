@@ -3,7 +3,7 @@ package com.example.campus_navigation_backend.domain.graph;
 import java.util.List;
 
 /**
- * CampusGraph에서 두 노드를 연결하는 방향성 엣지이다.
+ * 캠퍼스 그래프에서 두 노드를 연결하는 방향성 엣지이다.
  *
  * @param fromNodeId 시작 노드 ID
  * @param toNodeId 도착 노드 ID

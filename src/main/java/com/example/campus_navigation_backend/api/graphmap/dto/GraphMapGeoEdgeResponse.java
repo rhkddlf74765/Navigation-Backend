@@ -3,7 +3,7 @@ package com.example.campus_navigation_backend.api.graphmap.dto;
 import java.util.List;
 
 /**
- * Graph edge converted to WGS84 for map rendering.
+ * 지도 렌더링을 위해 WGS84로 변환된 그래프 엣지이다.
  */
 public record GraphMapGeoEdgeResponse(
         long fromNodeId,

@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.domain.graph;
 
 /**
- * CampusGraph를 구성하는 노드이다.
+ * 캠퍼스 그래프를 구성하는 노드이다.
  *
  * @param id 그래프 내부 노드 ID
  * @param type 노드 유형

@@ -6,3 +6,4 @@ public record RoutePoint(
         double z
 ) {
 }
+

@@ -2,11 +2,9 @@ package com.example.campus_navigation_backend.repository;
 
 import com.example.campus_navigation_backend.config.NavigationProperties;
 import com.example.campus_navigation_backend.domain.graph.Point3D;
-import com.example.campus_navigation_backend.repository.dto.CurrentProjectionRow;
-import com.example.campus_navigation_backend.repository.dto.EntranceRow;
+import com.example.campus_navigation_backend.repository.dto.BuildingPointRow;
 import com.example.campus_navigation_backend.repository.dto.GraphEdgeRow;
 import com.example.campus_navigation_backend.repository.dto.GraphNodeRow;
-import com.example.campus_navigation_backend.repository.dto.LineSegmentRow;
 import com.example.campus_navigation_backend.repository.dto.TransformedPointRow;
 import com.example.campus_navigation_backend.support.GeoJsonGeometryParser;
 import com.example.campus_navigation_backend.visualizer.Wgs84PointRow;
@@ -29,6 +27,9 @@ public class JdbcNavigationRepository implements NavigationRepository {
     private final GeoJsonGeometryParser geoJsonGeometryParser;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 메모리 그래프는 metric 좌표에서 동작하므로, PostGIS에서 그래프 노드를 읽어 설정된 metric SRID로 변환한다.
+     */
     @Override
     public List<GraphNodeRow> findAllGraphNodes() {
         String sql = """
@@ -66,6 +67,10 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
+    /**
+     * 경로 탐색 비용과 경로 시각화가 모두 그래프 좌표계의 엣지 polyline을 필요로 하므로,
+     * 미터 단위 형상의 그래프 엣지를 조회한다.
+     */
     @Override
     public List<GraphEdgeRow> findAllGraphEdges() {
         String sql = """
@@ -98,73 +103,39 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
+    /**
+     * 라우팅 끝점 해석 과정에서 {@link com.example.campus_navigation_backend.application.building.BuildingPointStore}에 캐싱할 수 있도록,
+     * 이름이 있는 건물 지점을 읽어 metric 좌표로 변환한다.
+     */
     @Override
-    public List<LineSegmentRow> findAllWalkableLineSegments() {
+    public List<BuildingPointRow> findAllBuildingPoints() {
         String sql = """
                 SELECT
                     id,
-                    highway,
-                    ST_X(ST_StartPoint(mgeom)) AS sx,
-                    ST_Y(ST_StartPoint(mgeom)) AS sy,
-                    COALESCE(ST_Z(ST_StartPoint(mgeom)), 0) AS sz,
-                    ST_X(ST_EndPoint(mgeom)) AS ex,
-                    ST_Y(ST_EndPoint(mgeom)) AS ey,
-                    COALESCE(ST_Z(ST_EndPoint(mgeom)), 0) AS ez,
-                    ST_Length(mgeom) AS cost,
-                    ST_AsGeoJSON(mgeom) AS geom_json
-                FROM (
-                    SELECT id, highway, ST_Transform(geom, :metricSrid) AS mgeom
-                    FROM public.final_edges_3d
-                    WHERE geom IS NOT NULL
-                      AND highway IN (:walkableHighways)
-                ) t
-                """;
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("metricSrid", properties.metricSrid())
-                .addValue("walkableHighways", properties.walkableHighways());
-
-        return jdbc.query(sql, params, (rs, rowNum) ->
-                new LineSegmentRow(
-                        rs.getLong("id"),
-                        rs.getString("highway"),
-                        rs.getDouble("sx"),
-                        rs.getDouble("sy"),
-                        rs.getDouble("sz"),
-                        rs.getDouble("ex"),
-                        rs.getDouble("ey"),
-                        rs.getDouble("ez"),
-                        rs.getDouble("cost"),
-                        geoJsonGeometryParser.parseLineString(rs.getString("geom_json"))
-                )
-        );
-    }
-
-    @Override
-    public List<EntranceRow> findAllEntrances() {
-        String sql = """
-                SELECT
-                    id,
-                    description,
-                    node_type,
+                    description AS building_name,
                     ST_X(mgeom) AS x,
                     ST_Y(mgeom) AS y,
                     COALESCE(ST_Z(mgeom), 0) AS z
                 FROM (
-                    SELECT id, description, node_type, ST_Transform(geom, :metricSrid) AS mgeom
-                    FROM public.entrances
+                    SELECT
+                        id,
+                        description,
+                        ST_Transform(geom, :metricSrid) AS mgeom
+                    FROM public.final_nodes_3d
                     WHERE geom IS NOT NULL
+                      AND description IS NOT NULL
+                      AND BTRIM(description) <> ''
                 ) t
+                ORDER BY building_name, id
                 """;
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("metricSrid", properties.metricSrid());
 
         return jdbc.query(sql, params, (rs, rowNum) ->
-                new EntranceRow(
+                new BuildingPointRow(
                         rs.getLong("id"),
-                        rs.getString("description"),
-                        rs.getString("node_type"),
+                        rs.getString("building_name"),
                         rs.getDouble("x"),
                         rs.getDouble("y"),
                         rs.getDouble("z")
@@ -172,6 +143,9 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
+    /**
+     * 투영 로직이 거리 비교를 수행할 수 있도록 하나의 WGS84 요청 좌표를 metric 그래프 SRID로 변환한다.
+     */
     @Override
     public TransformedPointRow transformToMetric(double longitude, double latitude, double altitude) {
         String sql = """
@@ -203,70 +177,9 @@ public class JdbcNavigationRepository implements NavigationRepository {
         );
     }
 
-    @Override
-    public CurrentProjectionRow projectCurrentLocationToNearestLine(double x, double y, double z) {
-        String sql = """
-                WITH p AS (
-                    SELECT ST_SetSRID(ST_MakePoint(:x, :y, :z), :metricSrid) AS pt
-                )
-                SELECT
-                    line_id,
-                    frac,
-                    ST_X(proj_geom) AS px,
-                    ST_Y(proj_geom) AS py,
-                    COALESCE(ST_Z(proj_geom), 0) AS pz,
-                    ST_Distance(pt, proj_geom) AS connector_cost,
-                    ST_Length(ST_LineSubstring(line_geom, 0, frac)) AS left_cost,
-                    ST_Length(ST_LineSubstring(line_geom, frac, 1)) AS right_cost,
-                    ST_AsGeoJSON(ST_MakeLine(pt, proj_geom)) AS connector_geom_json,
-                    ST_AsGeoJSON(ST_LineSubstring(line_geom, 0, frac)) AS left_geom_json,
-                    ST_AsGeoJSON(ST_LineSubstring(line_geom, frac, 1)) AS right_geom_json
-                FROM (
-                    SELECT
-                        l.id AS line_id,
-                        pt,
-                        ST_Transform(l.geom, :metricSrid) AS line_geom,
-                        ST_LineLocatePoint(ST_Transform(l.geom, :metricSrid), pt) AS frac,
-                        ST_LineInterpolatePoint(
-                            ST_Transform(l.geom, :metricSrid),
-                            ST_LineLocatePoint(ST_Transform(l.geom, :metricSrid), pt)
-                        ) AS proj_geom
-                    FROM p
-                    JOIN LATERAL (
-                        SELECT id, geom
-                        FROM public.final_edges_3d
-                        WHERE geom IS NOT NULL
-                          AND highway IN (:walkableHighways)
-                        ORDER BY ST_Distance(ST_Transform(geom, :metricSrid), pt)
-                        LIMIT 1
-                    ) l ON TRUE
-                ) q
-                """;
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("x", x)
-                .addValue("y", y)
-                .addValue("z", z)
-                .addValue("metricSrid", properties.metricSrid())
-                .addValue("walkableHighways", properties.walkableHighways());
-
-        return jdbc.queryForObject(sql, params, (rs, rowNum) ->
-                new CurrentProjectionRow(
-                        rs.getLong("line_id"),
-                        rs.getDouble("frac"),
-                        rs.getDouble("px"),
-                        rs.getDouble("py"),
-                        rs.getDouble("pz"),
-                        rs.getDouble("connector_cost"),
-                        rs.getDouble("left_cost"),
-                        rs.getDouble("right_cost"),
-                        geoJsonGeometryParser.parseLineString(rs.getString("connector_geom_json")),
-                        geoJsonGeometryParser.parseLineString(rs.getString("left_geom_json")),
-                        geoJsonGeometryParser.parseLineString(rs.getString("right_geom_json"))
-                )
-        );
-    }
-
+    /**
+     * 지도 클라이언트는 지리 좌표를 렌더링하므로 metric 그래프 경로 좌표를 WGS84로 다시 변환한다.
+     */
     @Override
     public List<Wgs84PointRow> transformMetricPointsToWgs84(List<Point3D> metricPoints) {
         if (metricPoints == null || metricPoints.isEmpty()) {

@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 
 /**
- * CampusGraphStore를 통해 그래프를 읽고 A* 알고리즘으로 최단 경로를 탐색한다.
+ * 캠퍼스 그래프 저장소를 통해 그래프를 읽고 A* 알고리즘으로 최단 경로를 탐색한다.
  */
 @Component
 @RequiredArgsConstructor
@@ -76,7 +76,7 @@ public class AStarPathFinder {
     }
 
     /**
-     * A* 휴리스틱으로 사용할 현재 노드와 목표 노드 사이의 2D 직선 거리를 계산한다.
+     * 탐색 휴리스틱으로 사용할 현재 노드와 목표 노드 사이의 2D 직선 거리를 계산한다.
      *
      * @param nodeId 현재 노드 ID
      * @param goalNodeId 목표 노드 ID

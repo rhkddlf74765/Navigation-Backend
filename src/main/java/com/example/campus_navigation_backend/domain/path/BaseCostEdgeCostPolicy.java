@@ -3,7 +3,7 @@ package com.example.campus_navigation_backend.domain.path;
 import org.springframework.stereotype.Component;
 
 /**
- * Edge cost policy that ignores elevation differences and returns only the base cost.
+ * 고도 차이를 무시하고 기본 비용만 반환하는 엣지 비용 정책이다.
  */
 @Component
 public class BaseCostEdgeCostPolicy implements EdgeCostPolicy {

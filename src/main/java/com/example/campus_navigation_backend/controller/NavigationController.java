@@ -1,8 +1,8 @@
 package com.example.campus_navigation_backend.controller;
 
-import com.example.campus_navigation_backend.application.CampusNavigationFacade;
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
+import com.example.campus_navigation_backend.application.routing.CampusNavigationFacade;
 import com.example.campus_navigation_backend.visualizer.GraphMapFacade;
 import com.example.campus_navigation_backend.visualizer.GraphMapResponse;
 import com.example.campus_navigation_backend.visualizer.ProjectionMapRequest;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Navigation API의 HTTP 요청을 받아 application layer로 전달하는 REST Controller이다.
+ * 내비게이션 에이피아이의 HTTP 요청을 받아 응용 계층으로 전달하는 REST 컨트롤러이다.
  */
 @RestController
 @RequestMapping("/api/navigation")
@@ -43,7 +43,7 @@ public class NavigationController {
     }
 
     /**
-     * navigation 서버의 실행 여부를 확인한다.
+     * 내비게이션 서버의 실행 여부를 확인한다.
      *
      * @return 서버 상태 메시지
      */

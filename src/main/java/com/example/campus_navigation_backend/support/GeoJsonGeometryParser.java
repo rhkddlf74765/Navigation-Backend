@@ -10,14 +10,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * GeoJSON 파싱 담당
+ * 지리 좌표 JSON 파싱을 담당한다.
  * <p> DB에서 받은 geometry 문자열을 도메인 좌표 객체로 변환한다.
  */
 @Component
 @RequiredArgsConstructor
 public class GeoJsonGeometryParser {
     /**
-     * PostGIS에서 받은 JSON 문자열을 파싱한다.
+     * 공간 데이터베이스에서 받은 JSON 문자열을 파싱한다.
      * 그 결과로 Point3D, List<Point3D>를 생성한다.
      */
     private final ObjectMapper objectMapper;

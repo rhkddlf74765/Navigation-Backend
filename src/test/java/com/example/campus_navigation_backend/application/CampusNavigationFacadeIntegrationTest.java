@@ -2,6 +2,7 @@ package com.example.campus_navigation_backend.application;
 
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
+import com.example.campus_navigation_backend.application.routing.CampusNavigationFacade;
 import com.example.campus_navigation_backend.support.PostgisTestContainerSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +21,6 @@ class CampusNavigationFacadeIntegrationTest extends PostgisTestContainerSupport 
 
     /**
      * 임의의 출발 좌표에서 목적지 건물명까지 경로 응답을 생성할 수 있는지 검증한다.
-     * <p>중점 검증 대상은 Facade가 좌표 변환, 출발 후보 생성, 목적지 입구 조회, 최적 경로 조립을 끝까지 수행하는지 여부이다.
      */
     @Test
     void findsRouteFromArbitraryPointToDestinationBuilding() {

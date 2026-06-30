@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.api.graphmap.dto;
 
 /**
- * Projection preview in WGS84 coordinates.
+ * 세계 측지 좌표계로 표현된 투영 미리보기 응답이다.
  */
 public record GraphMapGeoProjectionResponse(
         GraphMapGeoPointRequest inputPoint,

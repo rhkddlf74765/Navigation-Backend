@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.domain.graph;
 
 /**
- * metric 좌표계에서 사용하는 3차원 좌표 값 객체이다.
+ * 미터 단위 좌표계에서 사용하는 3차원 좌표 값 객체이다.
  *
  * @param x x 좌표
  * @param y y 좌표

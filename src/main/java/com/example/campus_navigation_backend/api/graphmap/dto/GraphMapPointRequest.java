@@ -3,7 +3,7 @@ package com.example.campus_navigation_backend.api.graphmap.dto;
 import com.example.campus_navigation_backend.domain.graph.Point3D;
 
 /**
- * Map click point in the graph visualization coordinate system.
+ * 그래프 시각화 좌표계에서 전달되는 지도 클릭 지점이다.
  */
 public record GraphMapPointRequest(double x, double y, Double z) {
 

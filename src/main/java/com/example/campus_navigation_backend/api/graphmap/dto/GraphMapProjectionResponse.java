@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.api.graphmap.dto;
 
 /**
- * Projection result for a clicked point and its nearest edge.
+ * 클릭한 지점과 가장 가까운 엣지에 대한 투영 결과이다.
  */
 public record GraphMapProjectionResponse(
         GraphMapPointRequest inputPoint,

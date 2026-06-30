@@ -4,7 +4,7 @@ import com.example.campus_navigation_backend.domain.graph.GraphNodeType;
 import com.example.campus_navigation_backend.domain.graph.Point3D;
 
 /**
- * Row loaded from final_nodes_3d.
+ * 최종 노드 테이블에서 조회한 행이다.
  */
 public record GraphNodeRow(
         long id,

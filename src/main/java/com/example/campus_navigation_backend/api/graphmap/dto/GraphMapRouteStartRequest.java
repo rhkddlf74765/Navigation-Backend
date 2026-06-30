@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.api.graphmap.dto;
 
 /**
- * Route debug request containing the start and destination points.
+ * 출발 지점과 도착 지점을 포함하는 라우팅 디버그 요청이다.
  */
 public record GraphMapRouteStartRequest(
         GraphMapPointRequest startPoint,

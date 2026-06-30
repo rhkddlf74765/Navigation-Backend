@@ -256,10 +256,16 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    longitude: selectedStartPoint.longitude,
-                    latitude: selectedStartPoint.latitude,
-                    altitude: selectedStartPoint.altitude,
-                    destinationBuildingName
+                    start: {
+                        type: 'COORDINATE',
+                        longitude: selectedStartPoint.longitude,
+                        latitude: selectedStartPoint.latitude,
+                        altitude: selectedStartPoint.altitude
+                    },
+                    destination: {
+                        type: 'BUILDING',
+                        buildingName: destinationBuildingName
+                    }
                 })
             });
 

@@ -23,12 +23,12 @@ public class CampusGraph {
     private final Map<Long, GraphNode> nodes;
     /**
      * 각 노드에서 이동 가능한 엣지 목록
-     * key: 출발 node Id
-     * value: 출발 노드에서 나가는 GraphEdge 목록
+     * 키: 출발 노드 ID
+     * 값: 출발 노드에서 나가는 그래프 엣지 목록
      */
     private final Map<Long, List<GraphEdge>> adjacency;
     /**
-     * DB에서 읽은 라인 ID와, 그 라인이 그래프에서 어떤 시작/끝 노드로 변환됐는지 저장한다.
+     * 데이터베이스에서 읽은 라인 ID와, 그 라인이 그래프에서 어떤 시작/끝 노드로 변환됐는지 저장한다.
      */
     private final Map<Long, LineEndpoints> lineEndpointsByLineId;
     /**
@@ -45,7 +45,7 @@ public class CampusGraph {
     private final Set<Long> startCandidateNodeIds;
 
     /**
-     * Builder가 수집한 변경 가능한 자료구조를 불변 복사하여 그래프를 생성한다.
+     * 빌더가 수집한 변경 가능한 자료구조를 불변 복사하여 그래프를 생성한다.
      *
      * @param builder 그래프 생성용 빌더
      */
@@ -162,7 +162,7 @@ public class CampusGraph {
     }
 
     /**
-     * CampusGraph 생성 중에만 노드와 엣지를 추가하는 빌더이다.
+     * 캠퍼스 그래프 생성 중에만 노드와 엣지를 추가하는 빌더이다.
      */
     public static class Builder {
         private final AtomicLong nodeSequence = new AtomicLong(1);

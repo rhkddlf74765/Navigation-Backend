@@ -5,7 +5,7 @@ import com.example.campus_navigation_backend.domain.graph.Point3D;
 import java.util.List;
 
 /**
- * Row loaded from final_edges_split_3d.
+ * 분할된 최종 엣지 테이블에서 조회한 행이다.
  */
 public record GraphEdgeRow(
         long id,

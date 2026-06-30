@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.api.graphmap.dto;
 
 /**
- * Geographic point used by the Leaflet graph map.
+ * 그래프 지도에서 사용하는 지리 좌표이다.
  */
 public record GraphMapGeoPointRequest(
         double longitude,
