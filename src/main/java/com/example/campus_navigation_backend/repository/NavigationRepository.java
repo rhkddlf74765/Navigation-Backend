@@ -32,7 +32,7 @@ public interface NavigationRepository {
     /**
      * 요청 좌표를 그래프 투영과 A*에서 사용하는 metric 좌표계로 변환한다.
      */
-    TransformedPointRow transformToMetric(double longitude, double latitude, double altitude);
+    TransformedPointRow transformToMetric(double lon, double lat, double ele);
 
     /**
      * 지도 API가 경로를 렌더링할 수 있도록 metric 경로 좌표를 WGS84 좌표로 다시 변환한다.

@@ -18,11 +18,14 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RouteRequestResolverTest {
+
+    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     private FakeNavigationRepository navigationRepository;
     private BuildingPointStore buildingPointStore;
@@ -44,6 +47,7 @@ class RouteRequestResolverTest {
     @Test
     void resolvesCoordinateStartAndCoordinateDestinationToMetricPoints() {
         RouteRequest request = new RouteRequest(
+                TEST_USER_ID,
                 RouteEndpointRequest.coordinate(127.0, 37.0, 5.0),
                 RouteEndpointRequest.coordinate(128.0, 38.0, null)
         );
@@ -61,6 +65,7 @@ class RouteRequestResolverTest {
     @Test
     void resolvesBuildingStartAndBuildingDestinationFromStore() {
         RouteRequest request = new RouteRequest(
+                TEST_USER_ID,
                 RouteEndpointRequest.building("engineering building"),
                 RouteEndpointRequest.building("Engineering Building")
         );
@@ -82,6 +87,7 @@ class RouteRequestResolverTest {
     @Test
     void rejectsMissingEndpoint() {
         RouteRequest request = new RouteRequest(
+                TEST_USER_ID,
                 null,
                 RouteEndpointRequest.coordinate(128.0, 38.0, 0.0)
         );
@@ -92,20 +98,22 @@ class RouteRequestResolverTest {
     }
 
     @Test
-    void rejectsCoordinateEndpointWithoutLatitude() {
+    void rejectsCoordinateEndpointWithoutLat() {
         RouteRequest request = new RouteRequest(
+                TEST_USER_ID,
                 RouteEndpointRequest.coordinate(127.0, null, 0.0),
                 RouteEndpointRequest.coordinate(128.0, 38.0, 0.0)
         );
 
         assertThatThrownBy(() -> resolver.resolve(request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Longitude and latitude are required");
+                .hasMessageContaining("Lon and lat are required");
     }
 
     @Test
     void rejectsUnknownBuildingName() {
         RouteRequest request = new RouteRequest(
+                TEST_USER_ID,
                 RouteEndpointRequest.coordinate(127.0, 37.0, 0.0),
                 RouteEndpointRequest.building("Unknown Building")
         );
@@ -134,9 +142,9 @@ class RouteRequestResolverTest {
         }
 
         @Override
-        public TransformedPointRow transformToMetric(double longitude, double latitude, double altitude) {
+        public TransformedPointRow transformToMetric(double lon, double lat, double ele) {
             transformCallCount++;
-            return new TransformedPointRow(longitude * 1000.0, latitude * 1000.0, altitude);
+            return new TransformedPointRow(lon * 1000.0, lat * 1000.0, ele);
         }
 
         @Override

@@ -13,16 +13,16 @@ package com.example.campus_navigation_backend.application.dto;
  */
 public record RouteEndpointRequest(
         RouteEndpointType type,
-        Double longitude,
-        Double latitude,
-        Double altitude,
+        Double lon,
+        Double lat,
+        Double ele,
         String buildingName
 ) {
     /**
      * 호출자가 사용하지 않는 건물 필드를 직접 채우지 않아도 되도록 좌표 endpoint를 생성한다.
      */
-    public static RouteEndpointRequest coordinate(Double longitude, Double latitude, Double altitude) {
-        return new RouteEndpointRequest(RouteEndpointType.COORDINATE, longitude, latitude, altitude, null);
+    public static RouteEndpointRequest coordinate(Double lon, Double lat, Double ele) {
+        return new RouteEndpointRequest(RouteEndpointType.COORDINATE, lon, lat, ele, null);
     }
 
     /**

@@ -147,7 +147,7 @@ public class JdbcNavigationRepository implements NavigationRepository {
      * 투영 로직이 거리 비교를 수행할 수 있도록 하나의 WGS84 요청 좌표를 metric 그래프 SRID로 변환한다.
      */
     @Override
-    public TransformedPointRow transformToMetric(double longitude, double latitude, double altitude) {
+    public TransformedPointRow transformToMetric(double lon, double lat, double ele) {
         String sql = """
                 SELECT
                     ST_X(g) AS x,
@@ -155,16 +155,16 @@ public class JdbcNavigationRepository implements NavigationRepository {
                     COALESCE(ST_Z(g), 0) AS z
                 FROM (
                     SELECT ST_Transform(
-                        ST_SetSRID(ST_MakePoint(:lon, :lat, :alt), :requestSrid),
+                        ST_SetSRID(ST_MakePoint(:lon, :lat, :ele), :requestSrid),
                         :metricSrid
                     ) AS g
                 ) t
                 """;
 
         MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("lon", longitude)
-                .addValue("lat", latitude)
-                .addValue("alt", altitude)
+                .addValue("lon", lon)
+                .addValue("lat", lat)
+                .addValue("ele", ele)
                 .addValue("requestSrid", properties.requestSrid())
                 .addValue("metricSrid", properties.metricSrid());
 
@@ -207,9 +207,9 @@ public class JdbcNavigationRepository implements NavigationRepository {
             )
             SELECT
                 seq,
-                ST_X(geom) AS longitude,
-                ST_Y(geom) AS latitude,
-                COALESCE(ST_Z(geom), 0) AS altitude
+                ST_X(geom) AS lon,
+                ST_Y(geom) AS lat,
+                COALESCE(ST_Z(geom), 0) AS ele
             FROM input
             ORDER BY seq
             """;
@@ -221,9 +221,9 @@ public class JdbcNavigationRepository implements NavigationRepository {
         return jdbc.query(sql, params, (rs, rowNum) ->
                 new Wgs84PointRow(
                         rs.getLong("seq"),
-                        rs.getDouble("longitude"),
-                        rs.getDouble("latitude"),
-                        rs.getDouble("altitude")
+                        rs.getDouble("lon"),
+                        rs.getDouble("lat"),
+                        rs.getDouble("ele")
                 )
         );
     }
@@ -232,9 +232,9 @@ public class JdbcNavigationRepository implements NavigationRepository {
         try {
             List<Map<String, Double>> payload = metricPoints.stream()
                     .map(point -> Map.of(
-                            "x", point.x(),
-                            "y", point.y(),
-                            "z", point.z()
+                            "x", point.lon(),
+                            "y", point.lat(),
+                            "z", point.ele()
                     ))
                     .toList();
 

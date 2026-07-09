@@ -10,16 +10,16 @@ import jakarta.validation.constraints.NotNull;
  * @param altitude 고도
  */
 public record ProjectionMapRequest(
-        @NotNull Double latitude,
-        @NotNull Double longitude,
-        Double altitude
+        @NotNull Double lat,
+        @NotNull Double lon,
+        Double ele
 ) {
     /**
      * 고도가 생략된 경우 0으로 보정한다.
      *
      * @return 보정된 고도
      */
-    public double resolvedAltitude() {
-        return altitude == null ? 0.0 : altitude;
+    public double resolvedEle() {
+        return ele == null ? 0.0 : ele;
     }
 }

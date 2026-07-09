@@ -73,7 +73,7 @@ public class RouteSegmentBuilder {
      */
     private RouteSegment edgeSegment(List<Point3D> path, String edgeType) {
         double baseCost = pathCost(path);
-        double elevationDelta = path.get(path.size() - 1).z() - path.get(0).z();
+        double elevationDelta = path.get(path.size() - 1).ele() - path.get(0).ele();
         double adjustedCost = edgeCostPolicy.calculate(edgeType, edgeType, baseCost, elevationDelta);
         return new RouteSegment(adjustedCost, path);
     }
@@ -126,18 +126,18 @@ public class RouteSegmentBuilder {
      * 가장 가까운 엣지 geometry segment를 찾기 위해 점과 선분 사이의 2D 거리를 계산한다.
      */
     private double distanceToSegment(Point3D point, Point3D start, Point3D end) {
-        double dx = end.x() - start.x();
-        double dy = end.y() - start.y();
+        double dx = end.lon() - start.lon();
+        double dy = end.lat() - start.lat();
         double lengthSquared = dx * dx + dy * dy;
         double t = 0.0;
         if (lengthSquared > EPS) {
-            t = ((point.x() - start.x()) * dx + (point.y() - start.y()) * dy) / lengthSquared;
+            t = ((point.lon() - start.lon()) * dx + (point.lat() - start.lat()) * dy) / lengthSquared;
             t = Math.max(0.0, Math.min(1.0, t));
         }
         Point3D closest = new Point3D(
-                start.x() + (end.x() - start.x()) * t,
-                start.y() + (end.y() - start.y()) * t,
-                start.z() + (end.z() - start.z()) * t
+                start.lon() + (end.lon() - start.lon()) * t,
+                start.lat() + (end.lat() - start.lat()) * t,
+                start.ele() + (end.ele() - start.ele()) * t
         );
         return point.distance2D(closest);
     }

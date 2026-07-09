@@ -33,7 +33,7 @@ public class GeoJsonGeometryParser {
         return switch (type) {
             case "LineString" -> parseLineString(geoJson);
             case "Point" -> List.of(parsePoint(geoJson));
-            default -> throw new IllegalArgumentException("지원하지 않는 GeoJSON type입니다. type=" + type);
+            default -> throw new IllegalArgumentException("지?�하지 ?�는 GeoJSON type?�니?? type=" + type);
         };
     }
 
@@ -46,12 +46,12 @@ public class GeoJsonGeometryParser {
         String type = getType(root);
 
         if (!"LineString".equalsIgnoreCase(type)) {
-            throw new IllegalArgumentException("LineString GeoJSON이 아닙니다. type=" + type);
+            throw new IllegalArgumentException("LineString GeoJSON???�닙?�다. type=" + type);
         }
 
         JsonNode coordinates = root.get("coordinates");
         if (coordinates == null || !coordinates.isArray()) {
-            throw new IllegalArgumentException("LineString coordinates가 올바르지 않습니다.");
+            throw new IllegalArgumentException("LineString coordinates가 ?�바르�? ?�습?�다.");
         }
 
         List<Point3D> points = new ArrayList<>();
@@ -63,19 +63,19 @@ public class GeoJsonGeometryParser {
 
     public Point3D parsePoint(String geoJson) {
         if (geoJson == null || geoJson.isBlank()) {
-            throw new IllegalArgumentException("Point GeoJSON이 비어 있습니다.");
+            throw new IllegalArgumentException("Point GeoJSON??비어 ?�습?�다.");
         }
 
         JsonNode root = readTree(geoJson);
         String type = getType(root);
 
         if (!"Point".equalsIgnoreCase(type)) {
-            throw new IllegalArgumentException("Point GeoJSON이 아닙니다. type=" + type);
+            throw new IllegalArgumentException("Point GeoJSON???�닙?�다. type=" + type);
         }
 
         JsonNode coordinates = root.get("coordinates");
         if (coordinates == null || !coordinates.isArray()) {
-            throw new IllegalArgumentException("Point coordinates가 올바르지 않습니다.");
+            throw new IllegalArgumentException("Point coordinates가 ?�바르�? ?�습?�다.");
         }
 
         return toPoint3D(coordinates);
@@ -85,21 +85,21 @@ public class GeoJsonGeometryParser {
         try {
             return objectMapper.readTree(geoJson);
         } catch (Exception e) {
-            throw new IllegalArgumentException("GeoJSON 파싱에 실패했습니다. geoJson=" + geoJson, e);
+            throw new IllegalArgumentException("GeoJSON ?�싱???�패?�습?�다. geoJson=" + geoJson, e);
         }
     }
 
     private String getType(JsonNode root) {
         JsonNode typeNode = root.get("type");
         if (typeNode == null || typeNode.isNull()) {
-            throw new IllegalArgumentException("GeoJSON에 type 필드가 없습니다.");
+            throw new IllegalArgumentException("GeoJSON??type ?�드가 ?�습?�다.");
         }
         return typeNode.asText();
     }
 
     private Point3D toPoint3D(JsonNode coordinate) {
         if (coordinate == null || !coordinate.isArray() || coordinate.size() < 2) {
-            throw new IllegalArgumentException("좌표 형식이 올바르지 않습니다.");
+            throw new IllegalArgumentException("좌표 ?�식???�바르�? ?�습?�다.");
         }
 
         double x = coordinate.get(0).asDouble();

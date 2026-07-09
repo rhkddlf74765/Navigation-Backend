@@ -43,7 +43,7 @@ class CampusGraphIntegrationTest extends PostgisTestContainerSupport {
         assertThat(campusGraphStore.getAdjacency(entranceNodeId)).isNotEmpty();
 
         long startNodeId = nodes.stream()
-                .min(Comparator.comparingDouble(node -> node.point().x()))
+                .min(Comparator.comparingDouble(node -> node.point().lon()))
                 .orElseThrow()
                 .id();
 

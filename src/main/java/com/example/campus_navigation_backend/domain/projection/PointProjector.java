@@ -76,13 +76,13 @@ public class PointProjector {
                                                  Point3D segmentEnd,
                                                  double accumulatedCost,
                                                  double segmentCost) {
-        double dx = segmentEnd.x() - segmentStart.x();
-        double dy = segmentEnd.y() - segmentStart.y();
+        double dx = segmentEnd.lon() - segmentStart.lon();
+        double dy = segmentEnd.lat() - segmentStart.lat();
         double lengthSquared = dx * dx + dy * dy;
 
         double fraction = 0.0;
         if (lengthSquared > EPS) {
-            fraction = ((point.x() - segmentStart.x()) * dx + (point.y() - segmentStart.y()) * dy) / lengthSquared;
+            fraction = ((point.lon() - segmentStart.lon()) * dx + (point.lat() - segmentStart.lat()) * dy) / lengthSquared;
             fraction = Math.max(0.0, Math.min(1.0, fraction));
         }
 
@@ -103,9 +103,9 @@ public class PointProjector {
      */
     private Point3D interpolate(Point3D start, Point3D end, double fraction) {
         return new Point3D(
-                start.x() + (end.x() - start.x()) * fraction,
-                start.y() + (end.y() - start.y()) * fraction,
-                start.z() + (end.z() - start.z()) * fraction
+                start.lon() + (end.lon() - start.lon()) * fraction,
+                start.lat() + (end.lat() - start.lat()) * fraction,
+                start.ele() + (end.ele() - start.ele()) * fraction
         );
     }
 

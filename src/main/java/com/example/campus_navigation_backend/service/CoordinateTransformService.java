@@ -25,7 +25,7 @@ public class CoordinateTransformService {
      */
     public List<MapPoint> metricRouteToWgs84(List<RoutePoint> routePoints) {
         List<Point3D> metricPoints = routePoints.stream()
-                .map(point -> new Point3D(point.x(), point.y(), point.z()))
+                .map(point -> new Point3D(point.lon(), point.lat(), point.ele()))
                 .toList();
 
         return navigationRepository.transformMetricPointsToWgs84(metricPoints).stream()

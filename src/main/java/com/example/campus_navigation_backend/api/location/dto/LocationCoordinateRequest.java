@@ -13,9 +13,8 @@ import jakarta.validation.constraints.NotNull;
  * @param accuracyMeters GPS 측정 정확도
  */
 public record LocationCoordinateRequest(
-        @NotNull Double longitude,
-        @NotNull Double latitude,
-        Double altitude,
-        Double accuracyMeters
+        @NotNull Double lon,
+        @NotNull Double lat,
+        Double ele
 ) {
 }

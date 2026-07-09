@@ -83,7 +83,7 @@ public class GraphMapFacade {
      */
     public ProjectionMapResponse projectPointForMap(ProjectionMapRequest request) {
         Point3D metricPoint = navigationRepository
-                .transformToMetric(request.longitude(), request.latitude(), request.resolvedAltitude())
+                .transformToMetric(request.lon(), request.lat(), request.resolvedEle())
                 .toPoint3D();
 
         PointProjection projection = campusGraphStore.getEdges().stream()

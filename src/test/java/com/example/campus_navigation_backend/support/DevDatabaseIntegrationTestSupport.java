@@ -35,9 +35,9 @@ public abstract class DevDatabaseIntegrationTestSupport {
         registry.add("spring.datasource.username", () -> optionalValue("DEV_DB_USERNAME", "DB_USERNAME", "postgres"));
         registry.add("spring.datasource.password", () -> optionalValue("DEV_DB_PASSWORD", "DB_PASSWORD", ""));
 
-        registry.add("dev.test.start-longitude", () -> requiredValue("DEV_TEST_START_LONGITUDE"));
-        registry.add("dev.test.start-latitude", () -> requiredValue("DEV_TEST_START_LATITUDE"));
-        registry.add("dev.test.start-altitude", () -> optionalValue("DEV_TEST_START_ALTITUDE", "0.0"));
+        registry.add("dev.test.start-lon", () -> requiredValue("DEV_TEST_START_LON"));
+        registry.add("dev.test.start-lat", () -> requiredValue("DEV_TEST_START_LAT"));
+        registry.add("dev.test.start-ele", () -> optionalValue("DEV_TEST_START_ELE", "0.0"));
         registry.add("dev.test.destination-building", () -> requiredValue("DEV_TEST_DESTINATION_BUILDING"));
     }
 

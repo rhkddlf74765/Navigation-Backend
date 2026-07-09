@@ -46,11 +46,11 @@ public class RouteMapFacade {
      * 건물 기반 출발 endpoint처럼 좌표가 없으면 반환된 경로의 첫 번째 지점을 대신 사용한다.
      */
     private MapPoint resolveStartPoint(RouteRequest request, List<MapPoint> mapPath) {
-        if (request.start().longitude() != null && request.start().latitude() != null) {
+        if (request.start().lon() != null && request.start().lat() != null) {
             return new MapPoint(
-                    request.start().latitude(),
-                    request.start().longitude(),
-                    request.start().altitude() == null ? 0.0 : request.start().altitude()
+                    request.start().lat(),
+                    request.start().lon(),
+                    request.start().ele() == null ? 0.0 : request.start().ele()
             );
         }
 

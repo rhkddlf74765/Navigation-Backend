@@ -1,5 +1,6 @@
 package com.example.campus_navigation_backend.application;
 
+import com.example.campus_navigation_backend.application.dto.RouteEndpointRequest;
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
 import com.example.campus_navigation_backend.application.routing.CampusNavigationFacade;
@@ -7,6 +8,8 @@ import com.example.campus_navigation_backend.support.PostgisTestContainerSupport
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 class CampusNavigationFacadeIntegrationTest extends PostgisTestContainerSupport {
 
+    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
     @Autowired
     private CampusNavigationFacade campusNavigationFacade;
 
@@ -24,7 +29,11 @@ class CampusNavigationFacadeIntegrationTest extends PostgisTestContainerSupport 
      */
     @Test
     void findsRouteFromArbitraryPointToDestinationBuilding() {
-        RouteRequest request = new RouteRequest(0.0002, 0.0001, 0.0, "Test Building");
+        RouteRequest request = new RouteRequest(
+                TEST_USER_ID,
+                RouteEndpointRequest.coordinate(0.0002, 0.0001, 0.0),
+                RouteEndpointRequest.building("Test Building")
+        );
 
         RouteResponse response = campusNavigationFacade.findRoute(request);
 

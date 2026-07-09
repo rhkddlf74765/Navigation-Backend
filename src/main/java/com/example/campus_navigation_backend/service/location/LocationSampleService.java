@@ -3,7 +3,7 @@ package com.example.campus_navigation_backend.service.location;
 import com.example.campus_navigation_backend.api.location.dto.LocationCoordinateRequest;
 import com.example.campus_navigation_backend.api.location.dto.LocationSampleRequest;
 import com.example.campus_navigation_backend.api.location.dto.LocationSampleResponse;
-import com.example.campus_navigation_backend.repository.LocationSampleRepository;
+import com.example.campus_navigation_backend.log.service.LocationLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +20,7 @@ public class LocationSampleService {
 
     private static final double EARTH_RADIUS_METERS = 6_371_000.0;
 
-    private final LocationSampleRepository locationSampleRepository;
+    private final LocationLogService locationLogService;
 
     /**
      * 위치 샘플을 저장하고, 실제 좌표가 있는 경우 GPS 오차를 계산해 응답에 포함한다.
@@ -28,7 +28,7 @@ public class LocationSampleService {
     public LocationSampleResponse save(LocationSampleRequest request) {
         Instant receivedAt = Instant.now();
         Double errorMeters = calculateErrorMeters(request.gps(), request.actual());
-        Long id = locationSampleRepository.save(request, errorMeters, receivedAt);
+        Long id = locationLogService.save(request, errorMeters, receivedAt);
 
         return new LocationSampleResponse(id, errorMeters, receivedAt);
     }
@@ -42,10 +42,10 @@ public class LocationSampleService {
         }
 
         return haversineMeters(
-                gps.latitude(),
-                gps.longitude(),
-                actual.latitude(),
-                actual.longitude()
+                gps.lat(),
+                gps.lon(),
+                actual.lat(),
+                actual.lon()
         );
     }
 

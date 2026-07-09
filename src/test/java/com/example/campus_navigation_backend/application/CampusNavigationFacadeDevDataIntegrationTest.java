@@ -1,5 +1,6 @@
 package com.example.campus_navigation_backend.application;
 
+import com.example.campus_navigation_backend.application.dto.RouteEndpointRequest;
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
 import com.example.campus_navigation_backend.application.routing.CampusNavigationFacade;
@@ -8,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -15,17 +18,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CampusNavigationFacadeDevDataIntegrationTest extends DevDatabaseIntegrationTestSupport {
 
+    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
     @Autowired
     private CampusNavigationFacade campusNavigationFacade;
 
-    @Value("${dev.test.start-longitude}")
-    private double startLongitude;
+    @Value("${dev.test.start-lon}")
+    private double startLon;
 
-    @Value("${dev.test.start-latitude}")
-    private double startLatitude;
+    @Value("${dev.test.start-lat}")
+    private double startLat;
 
-    @Value("${dev.test.start-altitude}")
-    private double startAltitude;
+    @Value("${dev.test.start-ele}")
+    private double startEle;
 
     @Value("${dev.test.destination-building}")
     private String destinationBuildingName;
@@ -37,10 +42,9 @@ class CampusNavigationFacadeDevDataIntegrationTest extends DevDatabaseIntegratio
     @Test
     void findsRouteUsingConfiguredDevScenario() {
         RouteRequest request = new RouteRequest(
-                startLongitude,
-                startLatitude,
-                startAltitude,
-                destinationBuildingName
+                TEST_USER_ID,
+                RouteEndpointRequest.coordinate(startLon, startLat, startEle),
+                RouteEndpointRequest.building(destinationBuildingName)
         );
 
         RouteResponse response = campusNavigationFacade.findRoute(request);

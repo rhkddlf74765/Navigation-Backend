@@ -8,7 +8,7 @@ package com.example.campus_navigation_backend.domain.graph;
  * @param z z 좌표
  */
 public record Point3D(
-        double x, double y, double z
+        double lon, double lat, double ele
 ) {
     /**
      * 다른 좌표와의 2D 평면 거리를 계산한다.
@@ -17,7 +17,7 @@ public record Point3D(
      * @return 2D 거리
      */
     public double distance2D(Point3D other) {
-        return Math.hypot(x - other.x, y - other.y);
+        return Math.hypot(lon - other.lon, lat - other.lat);
     }
 
     /**
@@ -27,9 +27,9 @@ public record Point3D(
      * @return 3D 거리
      */
     public double distance3D(Point3D other) {
-        double dx = x - other.x;
-        double dy = y - other.y;
-        double dz = z - other.z;
+        double dx = lon - other.lon;
+        double dy = lat - other.lat;
+        double dz = ele - other.ele;
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 }

@@ -58,14 +58,14 @@ public class RouteRequestResolver {
      * 그래프 투영과 A*는 metric 그래프 좌표에서 동작하므로 좌표 endpoint를 metric 좌표계로 변환한다.
      */
     private ResolvedRouteEndpoint resolveCoordinate(RouteEndpointRequest endpoint) {
-        if (endpoint.longitude() == null || endpoint.latitude() == null) {
-            throw new IllegalArgumentException("Longitude and latitude are required for coordinate endpoint.");
+        if (endpoint.lon() == null || endpoint.lat() == null) {
+            throw new IllegalArgumentException("Lon and lat are required for coordinate endpoint.");
         }
 
         Point3D metricPoint = navigationRepository.transformToMetric(
-                endpoint.longitude(),
-                endpoint.latitude(),
-                endpoint.altitude() == null ? 0.0 : endpoint.altitude()
+                endpoint.lon(),
+                endpoint.lat(),
+                endpoint.ele() == null ? 0.0 : endpoint.ele()
         ).toPoint3D();
 
         return new ResolvedRouteEndpoint(RouteEndpointType.COORDINATE, List.of(metricPoint), null);

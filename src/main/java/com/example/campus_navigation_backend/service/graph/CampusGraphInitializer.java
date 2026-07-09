@@ -81,7 +81,7 @@ public class CampusGraphInitializer {
                 throw new IllegalStateException("Edge endpoint node not found. edgeId=" + row.id());
             }
 
-            double elevationDelta = target.point().z() - source.point().z();
+            double elevationDelta = target.point().ele() - source.point().ele();
             double forwardCost = edgeCostPolicy.calculate(row.highway(), row.highway(), row.cost(), elevationDelta);
             double reverseCost = edgeCostPolicy.calculate(row.highway(), row.highway(), row.cost(), -elevationDelta);
 

@@ -81,7 +81,7 @@
     const reloadButton = document.getElementById('reloadButton');
 
     function toLatLng(point) {
-        return [point.latitude, point.longitude];
+        return [point.lat, point.lon];
     }
 
     const edgePalette = [
@@ -198,7 +198,7 @@
     async function loadGraph() {
         statusElement.textContent = 'Loading graph...';
 
-        const response = await fetch('/api/navigation/graph-map');
+        const response = await fetch('/api/test/graph-map');
         if (!response.ok) {
             throw new Error(`Graph API failed: ${response.status}`);
         }
@@ -209,13 +209,13 @@
     async function projectPoint(latLng) {
         statusElement.textContent = 'Projecting point...';
 
-        const response = await fetch('/api/navigation/projection-map', {
+        const response = await fetch('/api/test/graph-map/projections', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                latitude: latLng.lat,
-                longitude: latLng.lng,
-                altitude: 0
+                lat: latLng.lat,
+                lon: latLng.lng,
+                ele: 0
             })
         });
 

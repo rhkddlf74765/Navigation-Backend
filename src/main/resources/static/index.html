@@ -194,9 +194,9 @@
 
         currentLocationBox.innerHTML = `
             <strong>선택된 현재 위치</strong><br>
-            latitude: ${selectedStartPoint.latitude.toFixed(7)}<br>
-            longitude: ${selectedStartPoint.longitude.toFixed(7)}<br>
-            altitude: ${selectedStartPoint.altitude.toFixed(2)}
+            lat: ${selectedStartPoint.lat.toFixed(7)}<br>
+            lon: ${selectedStartPoint.lon.toFixed(7)}<br>
+            ele: ${selectedStartPoint.ele.toFixed(2)}
         `;
     }
 
@@ -213,9 +213,9 @@
         const { lat, lng } = event.latlng;
 
         selectedStartPoint = {
-            latitude: lat,
-            longitude: lng,
-            altitude: 0.0
+            lat: lat,
+            lon: lng,
+            ele: 0.0
         };
 
         markerLayerGroup.clearLayers();
@@ -250,7 +250,7 @@
         setStatus('경로를 요청하는 중...');
 
         try {
-            const response = await fetch('/api/navigation/route-map', {
+            const response = await fetch('/api/test/route-map/routes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -258,9 +258,9 @@
                 body: JSON.stringify({
                     start: {
                         type: 'COORDINATE',
-                        longitude: selectedStartPoint.longitude,
-                        latitude: selectedStartPoint.latitude,
-                        altitude: selectedStartPoint.altitude
+                        lon: selectedStartPoint.lon,
+                        lat: selectedStartPoint.lat,
+                        ele: selectedStartPoint.ele
                     },
                     destination: {
                         type: 'BUILDING',
@@ -276,7 +276,7 @@
 
             const data = await response.json();
 
-            const startLatLng = [data.startPoint.latitude, data.startPoint.longitude];
+            const startLatLng = [data.startPoint.lat, data.startPoint.lon];
 
             markerLayerGroup.clearLayers();
 
@@ -284,7 +284,7 @@
                 .bindPopup('현재 위치')
                 .addTo(markerLayerGroup);
 
-            const pathLatLngs = data.path.map(point => [point.latitude, point.longitude]);
+            const pathLatLngs = data.path.map(point => [point.lat, point.lon]);
 
             if (pathLatLngs.length > 0) {
                 const polyline = L.polyline(pathLatLngs, {

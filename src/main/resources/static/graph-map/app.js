@@ -37,11 +37,11 @@ function setMode(mode) {
 }
 
 function formatLatLng(point) {
-    return `${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`;
+    return `${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}`;
 }
 
 function toLatLng(point) {
-    return [point.latitude, point.longitude];
+    return [point.lat, point.lon];
 }
 
 function clearLayers() {
@@ -87,7 +87,7 @@ function renderGraph() {
             node.nodeType === 'ENTRANCE' ? '#f97316' :
             '#000000';
 
-        const marker = L.circleMarker([node.latitude, node.longitude], {
+        const marker = L.circleMarker([node.lat, node.lon], {
             radius: node.nodeType === 'ENTRANCE' ? 6 : 4,
             color,
             fillColor: color,
@@ -139,7 +139,7 @@ function renderSelections() {
 }
 
 async function loadGraph() {
-    const response = await fetch('/api/navigation/graph-map/geo/graph');
+    const response = await fetch('/api/test/graph-map/geo/graph');
     state.graph = await response.json();
     state.nodeById = new Map(state.graph.nodes.map(node => [node.id, node]));
     state.edgeByKey = new Map();
@@ -151,7 +151,7 @@ async function loadGraph() {
 
     const bounds = L.latLngBounds([]);
     for (const node of state.graph.nodes) {
-        bounds.extend([node.latitude, node.longitude]);
+        bounds.extend([node.lat, node.lon]);
     }
     if (bounds.isValid()) {
         map.fitBounds(bounds.pad(0.12));
@@ -161,7 +161,7 @@ async function loadGraph() {
 }
 
 async function projectPoint(point) {
-    const response = await fetch('/api/navigation/graph-map/geo/projections', {
+    const response = await fetch('/api/test/graph-map/geo/projections', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(point)
@@ -171,16 +171,16 @@ async function projectPoint(point) {
 
 async function selectPoint(latlng) {
     const projection = await projectPoint({
-        longitude: latlng.lng,
-        latitude: latlng.lat,
-        altitude: 0.0
+        lon: latlng.lng,
+        lat: latlng.lat,
+        ele: 0.0
     });
 
     const payload = {
         inputPoint: {
-            longitude: latlng.lng,
-            latitude: latlng.lat,
-            altitude: 0.0
+            lon: latlng.lng,
+            lat: latlng.lat,
+            ele: 0.0
         },
         projectedPoint: projection.projectedPoint,
         edgeFromNodeId: projection.edgeFromNodeId,
@@ -208,7 +208,7 @@ async function startRoute() {
         return;
     }
 
-    const response = await fetch('/api/navigation/graph-map/geo/routes', {
+    const response = await fetch('/api/test/graph-map/geo/routes', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -236,7 +236,7 @@ async function startRoute() {
 
 async function pollSession() {
     if (!state.sessionId) return;
-    const response = await fetch(`/api/navigation/graph-map/geo/routes/${state.sessionId}`);
+    const response = await fetch(`/api/test/graph-map/geo/routes/${state.sessionId}`);
     state.session = await response.json();
 
     document.getElementById('routeStatus').textContent = state.session.status;
