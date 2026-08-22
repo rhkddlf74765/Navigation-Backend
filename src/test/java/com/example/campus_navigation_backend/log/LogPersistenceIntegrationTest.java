@@ -122,7 +122,15 @@ class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
     private void assertRouteResultLog(UUID routeSessionId) {
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
-                SELECT destination_building_name, selected_entrance_id, total_distance_meters, path::text AS path
+                SELECT destination_building_name,
+                       selected_entrance_id,
+                       total_distance_meters,
+                       total_cost,
+                       approach_distance_meters,
+                       approach_cost,
+                       graph_distance_meters,
+                       graph_cost,
+                       path::text AS path
                 FROM log.route_result_log
                 WHERE route_session_id = ?
                 """,
@@ -132,6 +140,11 @@ class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
         assertThat(row.get("destination_building_name")).isEqualTo("Test Building");
         assertThat(row.get("selected_entrance_id")).isNotNull();
         assertThat((Double) row.get("total_distance_meters")).isGreaterThan(0.0);
+        assertThat((Double) row.get("total_cost")).isGreaterThan(0.0);
+        assertThat((Double) row.get("approach_distance_meters")).isGreaterThanOrEqualTo(0.0);
+        assertThat((Double) row.get("approach_cost")).isGreaterThanOrEqualTo(0.0);
+        assertThat((Double) row.get("graph_distance_meters")).isGreaterThanOrEqualTo(0.0);
+        assertThat((Double) row.get("graph_cost")).isGreaterThanOrEqualTo(0.0);
         assertThat((String) row.get("path")).contains("lon", "lat", "ele");
     }
 

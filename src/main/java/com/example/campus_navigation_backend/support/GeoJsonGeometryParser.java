@@ -1,7 +1,6 @@
 package com.example.campus_navigation_backend.support;
 
-import com.example.campus_navigation_backend.domain.graph.Point3D;
-import lombok.RequiredArgsConstructor;
+import com.example.campus_navigation_backend.domain.graph.MetricPoint;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -10,102 +9,162 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 지리 좌표 JSON 파싱을 담당한다.
- * <p> DB에서 받은 geometry 문자열을 도메인 좌표 객체로 변환한다.
+ * PostGIS에서 GeoJSON 형태로 조회한 LineString을
+ * 내부 metric 좌표인 MetricPoint 목록으로 변환한다.
+ *
+ * JdbcGraphDataRepository에서 ST_Transform(..., metricSrid)을
+ * 수행한 이후의 GeoJSON만 입력받는 것을 전제로 한다.
  */
 @Component
-@RequiredArgsConstructor
 public class GeoJsonGeometryParser {
-    /**
-     * 공간 데이터베이스에서 받은 JSON 문자열을 파싱한다.
-     * 그 결과로 Point3D, List<Point3D>를 생성한다.
-     */
+
     private final ObjectMapper objectMapper;
 
-    public List<Point3D> parseGeometry(String geoJson) {
-        if (geoJson == null || geoJson.isBlank()) {
-            return List.of();
-        }
-
-        JsonNode root = readTree(geoJson);
-        String type = getType(root);
-
-        return switch (type) {
-            case "LineString" -> parseLineString(geoJson);
-            case "Point" -> List.of(parsePoint(geoJson));
-            default -> throw new IllegalArgumentException("지?�하지 ?�는 GeoJSON type?�니?? type=" + type);
-        };
+    public GeoJsonGeometryParser(
+            ObjectMapper objectMapper
+    ) {
+        this.objectMapper = objectMapper;
     }
 
-    public List<Point3D> parseLineString(String geoJson) {
+    /**
+     * GeoJSON LineString을 MetricPoint 목록으로 변환한다.
+     *
+     * 입력 좌표는 이미 내부 metric CRS로 변환되어 있어야 한다.
+     */
+    public List<MetricPoint> parseLineString(
+            String geoJson
+    ) {
         if (geoJson == null || geoJson.isBlank()) {
-            return List.of();
+            throw new IllegalArgumentException(
+                    "LineString GeoJSON must not be blank."
+            );
         }
 
         JsonNode root = readTree(geoJson);
-        String type = getType(root);
 
-        if (!"LineString".equalsIgnoreCase(type)) {
-            throw new IllegalArgumentException("LineString GeoJSON???�닙?�다. type=" + type);
+        validateLineString(root);
+
+        JsonNode coordinates =
+                root.get("coordinates");
+
+        if (coordinates.size() < 2) {
+            throw new IllegalArgumentException(
+                    "LineString must contain at least two coordinates."
+            );
         }
 
-        JsonNode coordinates = root.get("coordinates");
-        if (coordinates == null || !coordinates.isArray()) {
-            throw new IllegalArgumentException("LineString coordinates가 ?�바르�? ?�습?�다.");
-        }
+        List<MetricPoint> points =
+                new ArrayList<>(
+                        coordinates.size()
+                );
 
-        List<Point3D> points = new ArrayList<>();
         for (JsonNode coordinate : coordinates) {
-            points.add(toPoint3D(coordinate));
+            points.add(
+                    toMetricPoint(
+                            coordinate
+                    )
+            );
         }
-        return points;
+
+        return List.copyOf(points);
     }
 
-    public Point3D parsePoint(String geoJson) {
-        if (geoJson == null || geoJson.isBlank()) {
-            throw new IllegalArgumentException("Point GeoJSON??비어 ?�습?�다.");
+    private void validateLineString(
+            JsonNode root
+    ) {
+        JsonNode typeNode =
+                root.get("type");
+
+        if (typeNode == null
+                || typeNode.isNull()) {
+
+            throw new IllegalArgumentException(
+                    "GeoJSON type field is missing."
+            );
         }
 
-        JsonNode root = readTree(geoJson);
-        String type = getType(root);
+        String type =
+                typeNode.asText();
 
-        if (!"Point".equalsIgnoreCase(type)) {
-            throw new IllegalArgumentException("Point GeoJSON???�닙?�다. type=" + type);
+        if (!"LineString"
+                .equalsIgnoreCase(type)) {
+
+            throw new IllegalArgumentException(
+                    "GeoJSON type must be LineString. type="
+                            + type
+            );
         }
 
-        JsonNode coordinates = root.get("coordinates");
-        if (coordinates == null || !coordinates.isArray()) {
-            throw new IllegalArgumentException("Point coordinates가 ?�바르�? ?�습?�다.");
-        }
+        JsonNode coordinates =
+                root.get("coordinates");
 
-        return toPoint3D(coordinates);
+        if (coordinates == null
+                || !coordinates.isArray()) {
+
+            throw new IllegalArgumentException(
+                    "LineString coordinates must be an array."
+            );
+        }
     }
 
-    private JsonNode readTree(String geoJson) {
+    /**
+     * 그래프의 elevation 기반 cost 계산에 Z가 필요하므로
+     * edge geometry는 반드시 XYZ 좌표를 가져야 한다.
+     *
+     * Z가 없는 데이터를 0으로 조용히 대체하지 않고
+     * startup 과정에서 잘못된 그래프 데이터로 판단한다.
+     */
+    private MetricPoint toMetricPoint(
+            JsonNode coordinate
+    ) {
+        if (coordinate == null
+                || !coordinate.isArray()
+                || coordinate.size() < 3) {
+
+            throw new IllegalArgumentException(
+                    "Graph edge coordinate must contain x, y and z."
+            );
+        }
+
+        JsonNode xNode =
+                coordinate.get(0);
+
+        JsonNode yNode =
+                coordinate.get(1);
+
+        JsonNode zNode =
+                coordinate.get(2);
+
+        if (!xNode.isNumber()
+                || !yNode.isNumber()
+                || !zNode.isNumber()) {
+
+            throw new IllegalArgumentException(
+                    "Graph edge coordinate must contain numeric x, y and z values."
+            );
+        }
+
+        return new MetricPoint(
+                xNode.asDouble(),
+                yNode.asDouble(),
+                zNode.asDouble()
+        );
+    }
+
+    private JsonNode readTree(
+            String geoJson
+    ) {
         try {
-            return objectMapper.readTree(geoJson);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("GeoJSON ?�싱???�패?�습?�다. geoJson=" + geoJson, e);
+            return objectMapper.readTree(
+                    geoJson
+            );
+
+        } catch (Exception exception) {
+
+            throw new IllegalArgumentException(
+                    "Failed to parse GeoJSON.",
+                    exception
+            );
         }
-    }
-
-    private String getType(JsonNode root) {
-        JsonNode typeNode = root.get("type");
-        if (typeNode == null || typeNode.isNull()) {
-            throw new IllegalArgumentException("GeoJSON??type ?�드가 ?�습?�다.");
-        }
-        return typeNode.asText();
-    }
-
-    private Point3D toPoint3D(JsonNode coordinate) {
-        if (coordinate == null || !coordinate.isArray() || coordinate.size() < 2) {
-            throw new IllegalArgumentException("좌표 ?�식???�바르�? ?�습?�다.");
-        }
-
-        double x = coordinate.get(0).asDouble();
-        double y = coordinate.get(1).asDouble();
-        double z = coordinate.size() >= 3 ? coordinate.get(2).asDouble() : 0.0;
-
-        return new Point3D(x, y, z);
     }
 }

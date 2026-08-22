@@ -27,6 +27,7 @@ public class LocationSampleController {
      */
     @PostMapping
     public LocationSampleResponse save(@Valid @RequestBody LocationSampleRequest request) {
+        System.out.println(request.gps());
         return locationSampleService.save(request);
     }
 }

@@ -17,4 +17,8 @@ public record LocationCoordinateRequest(
         @NotNull Double lat,
         Double ele
 ) {
+    @Override
+    public String toString() {
+        return "lon: " + lon + "\nlat: " + lat + "\nele: " + ele;
+    }
 }

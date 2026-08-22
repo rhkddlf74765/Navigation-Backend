@@ -1,118 +1,141 @@
 package com.example.campus_navigation_backend.domain.projection;
 
-import com.example.campus_navigation_backend.domain.graph.GraphEdge;
-import com.example.campus_navigation_backend.domain.graph.Point3D;
+import com.example.campus_navigation_backend.domain.graph.EdgePosition;
+import com.example.campus_navigation_backend.domain.graph.MetricPoint;
+import com.example.campus_navigation_backend.domain.graph.PhysicalEdge;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * 임의의 포인트를 그래프 엣지 geometry 위의 가장 가까운 지점으로 투영한다.
- */
 @Component
 public class PointProjector {
 
     private static final double EPS = 1e-9;
 
-    /**
-     * 포인트를 엣지의 polyline geometry 위에 투영한다.
-     *
-     * @param point 투영할 원본 포인트
-     * @param edge 투영 대상 엣지
-     * @return 투영 결과
-     */
-    public PointProjection project(Point3D point, GraphEdge edge) {
-        List<Point3D> geometry = edge.geometry();
-        if (geometry == null || geometry.size() < 2) {
-            throw new IllegalArgumentException("Edge geometry must have at least two points.");
-        }
+    public EdgeProjection project(
+            MetricPoint point,
+            PhysicalEdge edge
+    ) {
+        List<MetricPoint> geometry =
+                edge.geometry();
 
-        ProjectionCandidate best = null;
-        double accumulatedCost = 0.0;
+        ProjectionCandidate best =
+                null;
 
-        for (int i = 0; i < geometry.size() - 1; i++) {
-            Point3D segmentStart = geometry.get(i);
-            Point3D segmentEnd = geometry.get(i + 1);
-            double segmentCost = segmentStart.distance3D(segmentEnd);
+        for (int i = 0;
+             i < geometry.size() - 1;
+             i++) {
 
-            ProjectionCandidate candidate = projectToSegment(
-                    point,
-                    segmentStart,
-                    segmentEnd,
-                    accumulatedCost,
-                    segmentCost
-            );
+            ProjectionCandidate candidate =
+                    projectToSegment(
+                            point,
+                            geometry.get(i),
+                            geometry.get(i + 1),
+                            i
+                    );
 
-            if (best == null || candidate.distanceFromSource() < best.distanceFromSource()) {
+            if (best == null
+                    || candidate.distanceMeters()
+                    < best.distanceMeters()) {
                 best = candidate;
             }
-
-            accumulatedCost += segmentCost;
         }
 
-        double totalGeometryCost = accumulatedCost;
-        return new PointProjection(
-                point,
-                best.projectedPoint(),
+        if (best == null) {
+            throw new IllegalStateException(
+                    "Projection candidate was not produced."
+            );
+        }
+
+        EdgePosition position =
+                edge.position(
+                        best.segmentIndex(),
+                        best.fraction()
+                );
+
+        return new EdgeProjection(
                 edge,
-                best.distanceFromSource(),
-                best.costFromEdgeStart(),
-                totalGeometryCost - best.costFromEdgeStart()
+                best.projectedPoint(),
+                position,
+                best.distanceMeters()
         );
     }
 
-    /**
-     * 포인트를 단일 segment 위에 투영한다.
-     *
-     * @param point 투영할 원본 포인트
-     * @param segmentStart segment 시작점
-     * @param segmentEnd segment 끝점
-     * @param accumulatedCost segment 시작점까지 누적된 비용
-     * @param segmentCost segment 비용
-     * @return segment 투영 후보
-     */
-    private ProjectionCandidate projectToSegment(Point3D point,
-                                                 Point3D segmentStart,
-                                                 Point3D segmentEnd,
-                                                 double accumulatedCost,
-                                                 double segmentCost) {
-        double dx = segmentEnd.lon() - segmentStart.lon();
-        double dy = segmentEnd.lat() - segmentStart.lat();
-        double lengthSquared = dx * dx + dy * dy;
+    private ProjectionCandidate
+    projectToSegment(
+            MetricPoint point,
+            MetricPoint start,
+            MetricPoint end,
+            int segmentIndex
+    ) {
+        double dx =
+                end.x() - start.x();
+
+        double dy =
+                end.y() - start.y();
+
+        double lengthSquared =
+                dx * dx + dy * dy;
 
         double fraction = 0.0;
+
         if (lengthSquared > EPS) {
-            fraction = ((point.lon() - segmentStart.lon()) * dx + (point.lat() - segmentStart.lat()) * dy) / lengthSquared;
-            fraction = Math.max(0.0, Math.min(1.0, fraction));
+            fraction =
+                    (
+                            (
+                                    point.x()
+                                            - start.x()
+                            ) * dx
+                                    +
+                                    (
+                                            point.y()
+                                                    - start.y()
+                                    ) * dy
+                    )
+                            / lengthSquared;
+
+            fraction =
+                    Math.max(
+                            0.0,
+                            Math.min(
+                                    1.0,
+                                    fraction
+                            )
+                    );
         }
 
-        Point3D projectedPoint = interpolate(segmentStart, segmentEnd, fraction);
-        double distanceFromSource = point.distance2D(projectedPoint);
-        double costFromEdgeStart = accumulatedCost + segmentCost * fraction;
+        MetricPoint projected =
+                new MetricPoint(
+                        start.x()
+                                + dx
+                                * fraction,
 
-        return new ProjectionCandidate(projectedPoint, distanceFromSource, costFromEdgeStart);
-    }
+                        start.y()
+                                + dy
+                                * fraction,
 
-    /**
-     * 두 좌표 사이의 보간 좌표를 계산한다.
-     *
-     * @param start 시작 좌표
-     * @param end 끝 좌표
-     * @param fraction 보간 비율
-     * @return 보간된 좌표
-     */
-    private Point3D interpolate(Point3D start, Point3D end, double fraction) {
-        return new Point3D(
-                start.lon() + (end.lon() - start.lon()) * fraction,
-                start.lat() + (end.lat() - start.lat()) * fraction,
-                start.ele() + (end.ele() - start.ele()) * fraction
+                        start.z()
+                                + (
+                                end.z()
+                                        - start.z()
+                        ) * fraction
+                );
+
+        return new ProjectionCandidate(
+                segmentIndex,
+                fraction,
+                projected,
+                point.distance2D(
+                        projected
+                )
         );
     }
 
     private record ProjectionCandidate(
-            Point3D projectedPoint,
-            double distanceFromSource,
-            double costFromEdgeStart
+            int segmentIndex,
+            double fraction,
+            MetricPoint projectedPoint,
+            double distanceMeters
     ) {
     }
 }

@@ -1,78 +1,300 @@
 package com.example.campus_navigation_backend.application.routing;
 
+import com.example.campus_navigation_backend.application.dto.RouteExpectedTime;
 import com.example.campus_navigation_backend.application.dto.RoutePoint;
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
-import com.example.campus_navigation_backend.application.routing.helper.*;
-import com.example.campus_navigation_backend.domain.graph.Point3D;
+import com.example.campus_navigation_backend.domain.geo.CoordinateTransformer;
+import com.example.campus_navigation_backend.domain.geo.GeoPoint;
+import com.example.campus_navigation_backend.domain.graph.RoutingArc;
+import com.example.campus_navigation_backend.domain.path.PathFinder;
+import com.example.campus_navigation_backend.domain.path.PathResult;
+import com.example.campus_navigation_backend.domain.routing.RoutingOverlay;
 import com.example.campus_navigation_backend.log.service.RouteLogService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * 라우팅 요청 해석부터 최종 응답 조립까지 경로 탐색 use case를 조율하는 application facade이다.
- * <p>
- * 컨트롤러가 사용하는 라우팅 진입점이며 endpoint 해석, 접근 경로 생성, 후보 경로 선택은 helper 구성요소에 위임한다.
- */
 @Service
-@RequiredArgsConstructor
 public class CampusNavigationFacade {
 
-    private final RouteRequestResolver routeRequestResolver;
-    private final EndpointAccessPathResolver endpointAccessPathResolver;
-    private final RouteCandidateEvaluator routeCandidateEvaluator;
-    private final RouteLogService routeLogService;
+    private final RouteRequestResolver
+            routeRequestResolver;
 
-    /**
-     * 라우팅 요청을 해석하고 접근 경로와 그래프 내부 경로를 조합해 최적 경로 응답을 반환한다.
-     */
-    public RouteResponse findRoute(RouteRequest request) {
-        UUID routeSessionId = UUID.randomUUID();
-        Instant requestedAt = Instant.now();
+    private final RoutingOverlayFactory
+            routingOverlayFactory;
+
+    private final PathFinder pathFinder;
+
+    private final CoordinateTransformer
+            coordinateTransformer;
+
+    private final RouteLogService
+            routeLogService;
+
+    public CampusNavigationFacade(
+            RouteRequestResolver
+                    routeRequestResolver,
+            RoutingOverlayFactory
+                    routingOverlayFactory,
+            PathFinder pathFinder,
+            CoordinateTransformer
+                    coordinateTransformer,
+            RouteLogService
+                    routeLogService
+    ) {
+        this.routeRequestResolver =
+                routeRequestResolver;
+
+        this.routingOverlayFactory =
+                routingOverlayFactory;
+
+        this.pathFinder =
+                pathFinder;
+
+        this.coordinateTransformer =
+                coordinateTransformer;
+
+        this.routeLogService =
+                routeLogService;
+    }
+
+    public RouteResponse findRoute(
+            RouteRequest request
+    ) {
+        UUID routeSessionId =
+                UUID.randomUUID();
+
+        Instant requestedAt =
+                Instant.now();
 
         try {
-            ResolvedRouteRequest resolvedRequest = routeRequestResolver.resolve(request);
-            EndpointAccessPaths accessPaths = endpointAccessPathResolver.resolve(resolvedRequest);
+            ResolvedRouteRequest
+                    resolvedRequest =
+                    routeRequestResolver
+                            .resolve(
+                                    request
+                            );
 
-            RouteCandidateResult bestRoute = routeCandidateEvaluator.findBestRoute(
-                    accessPaths.startAccessPaths(),
-                    accessPaths.destinationAccessPaths()
-            );
+            RouteResponse zeroRoute =
+                    zeroRouteIfSameCoordinate(
+                            routeSessionId,
+                            resolvedRequest
+                    );
 
-            RouteResponse response = toResponse(routeSessionId, resolvedRequest, bestRoute);
-            routeLogService.saveRouteReturned(request, response, requestedAt, Instant.now());
+            if (zeroRoute != null) {
+                routeLogService
+                        .saveRouteReturned(
+                                request,
+                                zeroRoute,
+                                requestedAt,
+                                Instant.now()
+                        );
+
+                return zeroRoute;
+            }
+
+            RoutingOverlay overlay =
+                    routingOverlayFactory
+                            .create(
+                                    resolvedRequest
+                            );
+
+            PathResult result =
+                    pathFinder.findPath(
+                            overlay,
+                            overlay.startNodeId(),
+                            overlay.goalNodeId()
+                    );
+
+            if (!result.found()) {
+                throw new IllegalStateException(
+                        "No reachable route found."
+                );
+            }
+
+            RouteResponse response =
+                    toResponse(
+                            routeSessionId,
+                            resolvedRequest,
+                            result
+                    );
+
+            routeLogService
+                    .saveRouteReturned(
+                            request,
+                            response,
+                            requestedAt,
+                            Instant.now()
+                    );
+
             return response;
+
         } catch (RuntimeException exception) {
-            routeLogService.saveRouteFailed(request, routeSessionId, requestedAt, Instant.now(), exception);
+
+            routeLogService
+                    .saveRouteFailed(
+                            request,
+                            routeSessionId,
+                            requestedAt,
+                            Instant.now(),
+                            exception
+                    );
+
             throw exception;
         }
     }
 
-    /**
-     * 컨트롤러가 application 내부 후보 객체에 의존하지 않도록 최종 후보 결과를 응답 DTO로 변환한다.
-     */
-    private RouteResponse toResponse(UUID routeSessionId, ResolvedRouteRequest request, RouteCandidateResult bestRoute) {
+    private RouteResponse
+    zeroRouteIfSameCoordinate(
+            UUID routeSessionId,
+            ResolvedRouteRequest request
+    ) {
+        if (!(request.start()
+                instanceof
+                ResolvedRouteEndpoint
+                        .Coordinate start)
+
+                || !(request.destination()
+                instanceof
+                ResolvedRouteEndpoint
+                        .Coordinate destination)) {
+
+            return null;
+        }
+
+        if (start.point()
+                .distance2D(
+                        destination.point()
+                ) > 1e-6) {
+            return null;
+        }
+
+        GeoPoint point =
+                coordinateTransformer
+                        .toWgs84(
+                                start.point()
+                        );
+
         return new RouteResponse(
                 routeSessionId,
-                request.destination().displayName(),
-                bestRoute.destinationEndpointNodeId(),
-                bestRoute.totalCost(),
-                bestRoute.startAccessCost() + bestRoute.destinationAccessCost(),
-                bestRoute.graphCost(),
-                toRoutePoints(bestRoute.routePath().points())
+                null,
+                null,
+                0.0,
+                0.0,
+                RouteExpectedTime
+                        .fromDistance(
+                                0.0
+                        ),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                List.of(
+                        toRoutePoint(point)
+                )
         );
     }
 
-    /**
-     * 응답 매핑 책임이 라우팅 계산과 섞이지 않도록 metric 그래프 좌표를 경로 좌표 DTO로 변환한다.
-     */
-    private List<RoutePoint> toRoutePoints(List<Point3D> points) {
-        return points.stream()
-                .map(point -> new RoutePoint(point.lon(), point.lat(), point.ele()))
-                .toList();
+    private RouteResponse toResponse(
+            UUID routeSessionId,
+            ResolvedRouteRequest request,
+            PathResult result
+    ) {
+        Long selectedEntranceId =
+                selectedDestinationEntranceId(
+                        request.destination(),
+                        result
+                );
+
+        List<RoutePoint> path =
+                result.pathPoints()
+                        .stream()
+                        .map(
+                                coordinateTransformer
+                                        ::toWgs84
+                        )
+                        .map(
+                                this::toRoutePoint
+                        )
+                        .toList();
+
+        return new RouteResponse(
+                routeSessionId,
+
+                request
+                        .destination()
+                        .displayName(),
+
+                selectedEntranceId,
+
+                result
+                        .totalDistanceMeters(),
+
+                result.totalCost(),
+
+                RouteExpectedTime
+                        .fromDistance(
+                                result
+                                        .totalDistanceMeters()
+                        ),
+
+                result
+                        .approachDistanceMeters(),
+
+                result.approachCost(),
+
+                result
+                        .graphDistanceMeters(),
+
+                result.graphCost(),
+
+                path
+        );
+    }
+
+    private Long
+    selectedDestinationEntranceId(
+            ResolvedRouteEndpoint destination,
+            PathResult result
+    ) {
+        if (!(destination
+                instanceof
+                ResolvedRouteEndpoint
+                        .Building building)) {
+            return null;
+        }
+
+        for (int i =
+             result.arcs().size() - 1;
+             i >= 0;
+             i--) {
+
+            RoutingArc arc =
+                    result.arcs().get(i);
+
+            if (building
+                    .entranceNodeIds()
+                    .contains(
+                            arc.fromNodeId()
+                    )) {
+
+                return arc.fromNodeId();
+            }
+        }
+
+        return null;
+    }
+
+    private RoutePoint toRoutePoint(
+            GeoPoint point
+    ) {
+        return new RoutePoint(
+                point.lon(),
+                point.lat(),
+                point.ele()
+        );
     }
 }

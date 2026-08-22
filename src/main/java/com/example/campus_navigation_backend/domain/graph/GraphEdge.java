@@ -2,20 +2,45 @@ package com.example.campus_navigation_backend.domain.graph;
 
 import java.util.List;
 
-/**
- * 캠퍼스 그래프에서 두 노드를 연결하는 방향성 엣지이다.
- *
- * @param fromNodeId 시작 노드 ID
- * @param toNodeId 도착 노드 ID
- * @param cost 경로 탐색에 사용하는 비용
- * @param edgeType 엣지 유형 또는 highway 값
- * @param geometry 엣지의 실제 좌표 geometry
- */
-public record GraphEdge (
+public record GraphEdge(
+        long edgeId,
         long fromNodeId,
         long toNodeId,
+        double distanceMeters,
         double cost,
         String edgeType,
-        List<Point3D> geometry
-){
+        List<MetricPoint> geometry
+) implements RoutingArc {
+
+    private static final double EPS = 1e-9;
+
+    public GraphEdge {
+        if (!Double.isFinite(distanceMeters)
+                || distanceMeters < 0.0) {
+            throw new IllegalArgumentException(
+                    "distanceMeters must be finite and non-negative."
+            );
+        }
+
+        if (!Double.isFinite(cost)
+                || cost < 0.0) {
+            throw new IllegalArgumentException(
+                    "cost must be finite and non-negative."
+            );
+        }
+
+        if (cost + EPS < distanceMeters) {
+            throw new IllegalArgumentException(
+                    "cost must be greater than or equal to distanceMeters."
+            );
+        }
+
+        geometry =
+                List.copyOf(geometry);
+    }
+
+    @Override
+    public RoutingArcKind kind() {
+        return RoutingArcKind.BASE_EDGE;
+    }
 }

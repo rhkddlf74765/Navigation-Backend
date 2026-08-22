@@ -1,8 +1,7 @@
 package com.example.campus_navigation_backend.domain.path;
 
-import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
-import com.example.campus_navigation_backend.domain.graph.GraphEdge;
-import lombok.RequiredArgsConstructor;
+import com.example.campus_navigation_backend.domain.graph.RoutingArc;
+import com.example.campus_navigation_backend.domain.graph.RoutingGraph;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,107 +12,196 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 
-/**
- * 캠퍼스 그래프 저장소를 통해 그래프를 읽고 A* 알고리즘으로 최단 경로를 탐색한다.
- */
 @Component
-@RequiredArgsConstructor
-public class AStarPathFinder {
+public class AStarPathFinder
+        implements PathFinder {
 
-    private static final double EPS = 1e-6;
-    private final CampusGraphStore campusGraphStore;
+    private static final double EPS = 1e-9;
 
-    /**
-     * 출발 노드에서 도착 노드까지의 최단 경로를 탐색한다.
-     *
-     * @param startNodeId 출발 노드 ID
-     * @param goalNodeId 도착 노드 ID
-     * @return 경로 탐색 결과
-     */
-    public PathResult findPath(long startNodeId, long goalNodeId) {
-        PriorityQueue<SearchState> open = new PriorityQueue<>(Comparator.comparingDouble(SearchState::fScore));
-        Map<Long, Double> gScore = new HashMap<>();
-        Map<Long, Long> cameFromNode = new HashMap<>();
-        Map<Long, GraphEdge> cameFromEdge = new HashMap<>();
-        int visitedCount = 0;
+    @Override
+    public PathResult findPath(
+            RoutingGraph graph,
+            long startNodeId,
+            long goalNodeId
+    ) {
+        if (!graph.containsNode(
+                startNodeId
+        )) {
+            throw new IllegalArgumentException(
+                    "Start node not found."
+            );
+        }
 
-        gScore.put(startNodeId, 0.0);
-        open.add(new SearchState(startNodeId, heuristic(startNodeId, goalNodeId)));
+        if (!graph.containsNode(
+                goalNodeId
+        )) {
+            throw new IllegalArgumentException(
+                    "Goal node not found."
+            );
+        }
+
+        if (startNodeId == goalNodeId) {
+            return PathResult.success(
+                    List.of()
+            );
+        }
+
+        PriorityQueue<SearchState> open =
+                new PriorityQueue<>(
+                        Comparator
+                                .comparingDouble(
+                                        SearchState::fScore
+                                )
+                                .thenComparingDouble(
+                                        SearchState::gScore
+                                )
+                );
+
+        Map<Long, Double> bestGScore =
+                new HashMap<>();
+
+        Map<Long, RoutingArc>
+                cameFromArc =
+                new HashMap<>();
+
+        bestGScore.put(
+                startNodeId,
+                0.0
+        );
+
+        open.add(
+                new SearchState(
+                        startNodeId,
+                        0.0,
+                        graph
+                                .estimateMinimumCost(
+                                        startNodeId,
+                                        goalNodeId
+                                )
+                )
+        );
 
         while (!open.isEmpty()) {
-            SearchState current = open.poll();
-            visitedCount++;
 
-            if (current.nodeId() == goalNodeId) {
-                System.out.println(
-                        "A* reached goal. start=" + startNodeId
-                                + ", goal=" + goalNodeId
-                                + ", visited=" + visitedCount
-                );
-                return reconstructPath(startNodeId, goalNodeId, cameFromNode, cameFromEdge, gScore.get(goalNodeId));
+            SearchState current =
+                    open.poll();
+
+            double bestKnown =
+                    bestGScore
+                            .getOrDefault(
+                                    current.nodeId(),
+                                    Double.POSITIVE_INFINITY
+                            );
+
+            if (current.gScore()
+                    > bestKnown + EPS) {
+                continue;
             }
 
-            for (GraphEdge edge : campusGraphStore.getAdjacency(current.nodeId())) {
-                double tentative = gScore.get(current.nodeId()) + edge.cost();
+            if (current.nodeId()
+                    == goalNodeId) {
+                return reconstructPath(
+                        startNodeId,
+                        goalNodeId,
+                        cameFromArc
+                );
+            }
 
-                if (tentative + EPS < gScore.getOrDefault(edge.toNodeId(), Double.POSITIVE_INFINITY)) {
-                    gScore.put(edge.toNodeId(), tentative);
-                    cameFromNode.put(edge.toNodeId(), current.nodeId());
-                    cameFromEdge.put(edge.toNodeId(), edge);
+            for (RoutingArc arc
+                    : graph
+                    .getAdjacency(
+                            current.nodeId()
+                    )) {
 
-                    double fScore = tentative + heuristic(edge.toNodeId(), goalNodeId);
-                    open.add(new SearchState(edge.toNodeId(), fScore));
+                double tentativeG =
+                        current.gScore()
+                                + arc.cost();
+
+                double knownG =
+                        bestGScore
+                                .getOrDefault(
+                                        arc.toNodeId(),
+                                        Double.POSITIVE_INFINITY
+                                );
+
+                if (tentativeG + EPS
+                        >= knownG) {
+                    continue;
                 }
+
+                bestGScore.put(
+                        arc.toNodeId(),
+                        tentativeG
+                );
+
+                cameFromArc.put(
+                        arc.toNodeId(),
+                        arc
+                );
+
+                double fScore =
+                        tentativeG
+                                + graph
+                                .estimateMinimumCost(
+                                        arc.toNodeId(),
+                                        goalNodeId
+                                );
+
+                open.add(
+                        new SearchState(
+                                arc.toNodeId(),
+                                tentativeG,
+                                fScore
+                        )
+                );
             }
         }
 
-        System.out.println(
-                "A* unreachable. start=" + startNodeId
-                        + ", goal=" + goalNodeId
-                        + ", visited=" + visitedCount
-        );
         return PathResult.unreachable();
     }
 
-    /**
-     * 탐색 휴리스틱으로 사용할 현재 노드와 목표 노드 사이의 2D 직선 거리를 계산한다.
-     *
-     * @param nodeId 현재 노드 ID
-     * @param goalNodeId 목표 노드 ID
-     * @return 휴리스틱 거리
-     */
-    private double heuristic(long nodeId, long goalNodeId) {
-        return campusGraphStore.distance2D(nodeId, goalNodeId);
-    }
+    private PathResult reconstructPath(
+            long startNodeId,
+            long goalNodeId,
+            Map<Long, RoutingArc>
+                    cameFromArc
+    ) {
+        List<RoutingArc> arcs =
+                new ArrayList<>();
 
-    /**
-     * 탐색 중 기록한 이전 노드와 엣지를 따라 최종 경로를 복원한다.
-     *
-     * @param startNodeId 출발 노드 ID
-     * @param goalNodeId 도착 노드 ID
-     * @param cameFromNode 각 노드의 이전 노드 매핑
-     * @param cameFromEdge 각 노드로 진입할 때 사용한 엣지 매핑
-     * @param totalCost 최종 누적 비용
-     * @return 복원된 경로 결과
-     */
-    private PathResult reconstructPath(long startNodeId,
-                                       long goalNodeId,
-                                       Map<Long, Long> cameFromNode,
-                                       Map<Long, GraphEdge> cameFromEdge,
-                                       double totalCost) {
-        List<GraphEdge> edges = new ArrayList<>();
-        long current = goalNodeId;
+        long current =
+                goalNodeId;
 
-        while (current != startNodeId) {
-            GraphEdge edge = cameFromEdge.get(current);
-            if (edge == null) {
-                return PathResult.unreachable();
+        while (current
+                != startNodeId) {
+
+            RoutingArc arc =
+                    cameFromArc.get(
+                            current
+                    );
+
+            if (arc == null) {
+                return PathResult
+                        .unreachable();
             }
-            edges.add(edge);
-            current = cameFromNode.get(current);
+
+            arcs.add(arc);
+
+            current =
+                    arc.fromNodeId();
         }
 
-        Collections.reverse(edges);
-        return PathResult.success(totalCost, edges);
+        Collections.reverse(arcs);
+
+        return PathResult.success(
+                arcs
+        );
+    }
+
+    private record SearchState(
+            long nodeId,
+            double gScore,
+            double fScore
+    ) {
     }
 }

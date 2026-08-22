@@ -34,11 +34,20 @@ public class RouteResultLogEntity {
     @Column(name = "total_distance_meters", nullable = false)
     private double totalDistanceMeters;
 
+    @Column(name = "total_cost", nullable = false)
+    private double totalCost;
+
     @Column(name = "approach_distance_meters", nullable = false)
     private double approachDistanceMeters;
 
+    @Column(name = "approach_cost", nullable = false)
+    private double approachCost;
+
     @Column(name = "graph_distance_meters", nullable = false)
     private double graphDistanceMeters;
+
+    @Column(name = "graph_cost", nullable = false)
+    private double graphCost;
 
     @ColumnTransformer(read = "path::text", write = "?::jsonb")
     @Column(name = "path", nullable = false, columnDefinition = "jsonb")
@@ -55,8 +64,11 @@ public class RouteResultLogEntity {
             String destinationBuildingName,
             long selectedEntranceId,
             double totalDistanceMeters,
+            double totalCost,
             double approachDistanceMeters,
+            double approachCost,
             double graphDistanceMeters,
+            double graphCost,
             String path,
             Instant createdAt
     ) {
@@ -65,8 +77,11 @@ public class RouteResultLogEntity {
         entity.destinationBuildingName = destinationBuildingName;
         entity.selectedEntranceId = selectedEntranceId;
         entity.totalDistanceMeters = totalDistanceMeters;
+        entity.totalCost = totalCost;
         entity.approachDistanceMeters = approachDistanceMeters;
+        entity.approachCost = approachCost;
         entity.graphDistanceMeters = graphDistanceMeters;
+        entity.graphCost = graphCost;
         entity.path = path;
         entity.createdAt = createdAt;
         return entity;

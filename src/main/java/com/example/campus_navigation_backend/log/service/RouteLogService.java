@@ -64,8 +64,11 @@ public class RouteLogService {
                 response.destinationBuildingName(),
                 response.selectedEntranceId(),
                 response.totalDistanceMeters(),
+                response.totalCost(),
                 response.approachDistanceMeters(),
+                response.approachCost(),
                 response.graphDistanceMeters(),
+                response.graphCost(),
                 toPathJson(response.path()),
                 respondedAt
         ));

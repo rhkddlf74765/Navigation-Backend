@@ -86,8 +86,11 @@ CREATE TABLE log.route_result_log (
     destination_building_name text,
     selected_entrance_id bigint,
     total_distance_meters double precision NOT NULL,
+    total_cost double precision NOT NULL,
     approach_distance_meters double precision NOT NULL,
+    approach_cost double precision NOT NULL,
     graph_distance_meters double precision NOT NULL,
+    graph_cost double precision NOT NULL,
     path jsonb NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT route_result_session_fk

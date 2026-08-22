@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.api.building;
 
 import com.example.campus_navigation_backend.api.building.dto.BuildingNameListResponse;
-import com.example.campus_navigation_backend.service.building.BuildingPointQueryService;
+import com.example.campus_navigation_backend.service.building.BuildingQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,13 +15,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class BuildingController {
 
-    private final BuildingPointQueryService buildingPointQueryService;
+    private final BuildingQueryService buildingQueryService;
 
     /**
      * 메모리에 로딩된 표시용 건물명 목록을 조회해 클라이언트에 반환한다.
      */
     @GetMapping
     public BuildingNameListResponse findBuildingNames() {
-        return new BuildingNameListResponse(buildingPointQueryService.findBuildingNames());
+        return new BuildingNameListResponse(buildingQueryService.findBuildingNames());
     }
 }
