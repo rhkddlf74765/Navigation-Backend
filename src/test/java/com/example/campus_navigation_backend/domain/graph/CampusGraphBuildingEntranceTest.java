@@ -16,24 +16,24 @@ class CampusGraphBuildingEntranceTest {
                 CampusGraph.builder();
 
         builder.addNode(
-                10L,
+                4L,
                 GraphNodeType.ENTRANCE,
                 new MetricPoint(0.0, 0.0, 0.0)
         );
         builder.addNode(
-                11L,
+                7L,
                 GraphNodeType.ENTRANCE,
                 new MetricPoint(1.0, 0.0, 0.0)
         );
         builder.addBuildingEntrance(
-                7L,
+                10L,
                 "Engineering Building",
-                10L
+                4L
         );
         builder.addBuildingEntrance(
-                7L,
+                10L,
                 "Engineering Building",
-                11L
+                7L
         );
 
         CampusGraph graph =
@@ -41,11 +41,11 @@ class CampusGraphBuildingEntranceTest {
 
         assertThat(
                 graph.findEntranceNodeIdsByBuildingId(
-                        7L
+                        10L
                 )
         ).containsExactly(
-                10L,
-                11L
+                4L,
+                7L
         );
 
         assertThat(
@@ -53,8 +53,8 @@ class CampusGraphBuildingEntranceTest {
                         " engineering   building "
                 )
         ).containsExactly(
-                10L,
-                11L
+                4L,
+                7L
         );
     }
 
@@ -67,12 +67,12 @@ class CampusGraphBuildingEntranceTest {
                 CampusGraph.builder();
 
         builder.addNode(
-                10L,
+                4L,
                 GraphNodeType.ENTRANCE,
                 new MetricPoint(0.0, 0.0, 0.0)
         );
         builder.addNode(
-                11L,
+                7L,
                 GraphNodeType.ENTRANCE,
                 new MetricPoint(1.0, 0.0, 0.0)
         );
@@ -84,12 +84,12 @@ class CampusGraphBuildingEntranceTest {
         builder.addBuildingEntrance(
                 1L,
                 "Start",
-                10L
+                4L
         );
         builder.addBuildingEntrance(
                 1L,
                 "Start",
-                11L
+                7L
         );
         builder.addBuildingEntrance(
                 2L,
@@ -131,8 +131,8 @@ class CampusGraphBuildingEntranceTest {
         ).extracting(
                 arc -> arc.toNodeId()
         ).containsExactlyInAnyOrder(
-                10L,
-                11L
+                4L,
+                7L
         );
 
         assertThat(

@@ -4,7 +4,25 @@ CREATE TABLE public.final_nodes_3d (
     id BIGINT PRIMARY KEY,
     node_type VARCHAR(50) NOT NULL,
     description VARCHAR(100),
+    entrance_id BIGINT,
     geom geometry(PointZ, 4326) NOT NULL
+);
+
+CREATE TABLE public.buildings (
+    id BIGINT PRIMARY KEY,
+    source_id TEXT UNIQUE,
+    name TEXT NOT NULL,
+    geom geometry(MultiPolygon, 5179) NOT NULL,
+    geom_3d geometry(MultiPolygonZ, 5179),
+    description TEXT
+);
+
+CREATE TABLE public.entrances (
+    id BIGINT PRIMARY KEY,
+    building_id BIGINT REFERENCES public.buildings(id),
+    geom geometry(PointZ, 4326) NOT NULL,
+    node_type VARCHAR(50) NOT NULL,
+    description TEXT
 );
 
 CREATE TABLE public.final_edges_split_3d (
@@ -13,17 +31,38 @@ CREATE TABLE public.final_edges_split_3d (
     highway VARCHAR(50) NOT NULL,
     source BIGINT NOT NULL,
     target BIGINT NOT NULL,
-    cost DOUBLE PRECISION NOT NULL,
+    dist DOUBLE PRECISION NOT NULL,
     geom geometry(LineStringZ, 4326) NOT NULL
 );
 
-INSERT INTO public.final_nodes_3d (id, node_type, description, geom) VALUES
-    (1, 'intersection', NULL, ST_GeomFromText('POINT Z (0 0 0)', 4326)),
-    (2, 'intersection', NULL, ST_GeomFromText('POINT Z (0.001 0 0)', 4326)),
-    (3, 'intersection', NULL, ST_GeomFromText('POINT Z (0.002 0 0)', 4326)),
-    (4, 'entrance', 'Test Building', ST_GeomFromText('POINT Z (0.003 0 0)', 4326));
+INSERT INTO public.buildings (id, source_id, name, geom, description) VALUES
+    (
+        10,
+        'test-building',
+        'Test Building',
+        ST_Transform(
+            ST_GeomFromText(
+                'MULTIPOLYGON(((0.0028 -0.0002, 0.0033 -0.0002, 0.0033 0.0002, 0.0028 0.0002, 0.0028 -0.0002)))',
+                4326
+            ),
+            5179
+        ),
+        NULL
+    );
 
-INSERT INTO public.final_edges_split_3d (id, original_edge_id, highway, source, target, cost, geom) VALUES
+INSERT INTO public.entrances (id, building_id, geom, node_type, description) VALUES
+    (100, 10, ST_GeomFromText('POINT Z (0.003 0 0)', 4326), 'entrance', 'Test Building'),
+    (101, 10, ST_GeomFromText('POINT Z (0.0031 0 0)', 4326), 'entrance', 'Test Building');
+
+INSERT INTO public.final_nodes_3d (id, node_type, description, entrance_id, geom) VALUES
+    (1, 'intersection', NULL, NULL, ST_GeomFromText('POINT Z (0 0 0)', 4326)),
+    (2, 'intersection', NULL, NULL, ST_GeomFromText('POINT Z (0.001 0 0)', 4326)),
+    (3, 'intersection', NULL, NULL, ST_GeomFromText('POINT Z (0.002 0 0)', 4326)),
+    (4, 'entrance', 'Test Building', 100, ST_GeomFromText('POINT Z (0.003 0 0)', 4326)),
+    (7, 'entrance', 'Test Building', 101, ST_GeomFromText('POINT Z (0.0031 0 0)', 4326)),
+    (100, 'intersection', NULL, NULL, ST_GeomFromText('POINT Z (0.004 0 0)', 4326));
+
+INSERT INTO public.final_edges_split_3d (id, original_edge_id, highway, source, target, dist, geom) VALUES
     (
         1,
         1,
@@ -50,6 +89,15 @@ INSERT INTO public.final_edges_split_3d (id, original_edge_id, highway, source, 
         4,
         ST_Length(ST_GeomFromText('LINESTRING Z (0.002 0 0, 0.003 0 0)', 4326)),
         ST_GeomFromText('LINESTRING Z (0.002 0 0, 0.003 0 0)', 4326)
+    ),
+    (
+        4,
+        4,
+        'footway',
+        4,
+        7,
+        ST_Length(ST_GeomFromText('LINESTRING Z (0.003 0 0, 0.0031 0 0)', 4326)),
+        ST_GeomFromText('LINESTRING Z (0.003 0 0, 0.0031 0 0)', 4326)
     );
 
 CREATE SCHEMA IF NOT EXISTS log;

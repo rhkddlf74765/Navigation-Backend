@@ -14,6 +14,7 @@ class GraphNodeRowTest {
                         1L,
                         " entrance ",
                         null,
+                        100L,
                         10L,
                         "Building",
                         0.0,

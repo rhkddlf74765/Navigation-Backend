@@ -42,6 +42,7 @@ public class JdbcGraphDataRepository
                     n.id,
                     n.node_type,
                     n.description,
+                    n.entrance_id,
                     b.id AS building_id,
                     b.name AS building_name,
                     ST_X(
@@ -67,8 +68,7 @@ public class JdbcGraphDataRepository
                     ) AS z
                 FROM public.final_nodes_3d n
                 LEFT JOIN public.entrances e
-                  ON LOWER(BTRIM(n.node_type)) = 'entrance'
-                 AND e.id = n.id
+                  ON e.id = n.entrance_id
                 LEFT JOIN public.buildings b
                   ON b.id = e.building_id
                 WHERE n.geom IS NOT NULL
@@ -94,6 +94,10 @@ public class JdbcGraphDataRepository
                                 ),
                                 rs.getString(
                                         "description"
+                                ),
+                                rs.getObject(
+                                        "entrance_id",
+                                        Long.class
                                 ),
                                 rs.getObject(
                                         "building_id",
