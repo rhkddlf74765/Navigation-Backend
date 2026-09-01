@@ -4,6 +4,7 @@ import com.example.campus_navigation_backend.config.NavigationProperties;
 import com.example.campus_navigation_backend.domain.graph.CampusGraph;
 import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
 import com.example.campus_navigation_backend.domain.graph.GraphNode;
+import com.example.campus_navigation_backend.domain.graph.GraphNodeType;
 import com.example.campus_navigation_backend.domain.graph.PhysicalEdge;
 import com.example.campus_navigation_backend.domain.graph.cost.EdgeCostPolicy;
 import com.example.campus_navigation_backend.infrastructure.spatial.EdgeSpatialIndex;
@@ -99,14 +100,18 @@ public class CampusGraphInitializer {
                     row.point()
             );
 
-            if (row.description() != null
+            if (row.graphNodeType()
+                    == GraphNodeType.ENTRANCE
+                    && row.buildingId() != null
+                    && row.buildingName() != null
                     && !row
-                    .description()
+                    .buildingName()
                     .isBlank()) {
 
                 builder
                         .addBuildingEntrance(
-                                row.description(),
+                                row.buildingId(),
+                                row.buildingName(),
                                 row.id()
                         );
             }

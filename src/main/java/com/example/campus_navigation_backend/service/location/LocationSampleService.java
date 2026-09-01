@@ -3,11 +3,17 @@ package com.example.campus_navigation_backend.service.location;
 import com.example.campus_navigation_backend.api.location.dto.request.LocationCoordinateRequest;
 import com.example.campus_navigation_backend.api.location.dto.request.LocationSampleRequest;
 import com.example.campus_navigation_backend.api.location.dto.response.LocationSampleResponse;
+import com.example.campus_navigation_backend.api.location.dto.response.NearbyBuildingResponse;
+import com.example.campus_navigation_backend.application.nearbyBuilding.NearbyBuildingService;
 import com.example.campus_navigation_backend.log.service.LocationLogService;
+import com.example.campus_navigation_backend.service.spatial.UserSpatialStateService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 위치 샘플 저장 use case를 처리하는 서비스이다.
@@ -18,9 +24,19 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class LocationSampleService {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(
+                    LocationSampleService.class
+            );
+
     private static final double EARTH_RADIUS_METERS = 6_371_000.0;
 
     private final LocationLogService locationLogService;
+
+    private final UserSpatialStateService
+            userSpatialStateService;
+
+    private final NearbyBuildingService nearbyBuildingService;
 
     /**
      * 위치 샘플을 저장하고, 실제 좌표가 있는 경우 GPS 오차를 계산해 응답에 포함한다.
@@ -28,9 +44,78 @@ public class LocationSampleService {
     public LocationSampleResponse save(LocationSampleRequest request) {
         Instant receivedAt = Instant.now();
         Double errorMeters = calculateErrorMeters(request.gps(), request.actual());
-        Long id = locationLogService.save(request, errorMeters, receivedAt);
 
-        return new LocationSampleResponse(id, errorMeters, receivedAt);
+        try {
+            locationLogService.save(
+                    request,
+                    errorMeters,
+                    receivedAt
+            );
+        } catch (RuntimeException e) {
+            log.warn(
+                    "Failed to save location sample log. userId={}",
+                    request.userId(),
+                    e
+            );
+        }
+
+        Instant observedAt =
+                request.recordedAt() == null
+                        ? receivedAt
+                        : request.recordedAt();
+
+        try {
+            userSpatialStateService
+                    .updateFromGps(
+                            request.userId(),
+                            request.gps().lat(),
+                            request.gps().lon(),
+                            observedAt
+                    );
+        } catch (RuntimeException e) {
+            log.warn(
+                    "Failed to update user spatial state. userId={}",
+                    request.userId(),
+                    e
+            );
+        }
+
+        List<NearbyBuildingResponse>
+                nearbyBuildings =
+                findNearbyBuildings(
+                        request
+                );
+
+        return new LocationSampleResponse(
+                receivedAt,
+                nearbyBuildings
+        );
+    }
+
+    private List<NearbyBuildingResponse>
+    findNearbyBuildings(
+            LocationSampleRequest request
+    ) {
+        try {
+            return nearbyBuildingService
+                    .findNearby(
+                            request.gps().lat(),
+                            request.gps().lon()
+                    )
+                    .stream()
+                    .map(
+                            NearbyBuildingResponse::from
+                    )
+                    .toList();
+        } catch (RuntimeException e) {
+            log.warn(
+                    "Failed to query nearby buildings. userId={}",
+                    request.userId(),
+                    e
+            );
+
+            return List.of();
+        }
     }
 
     /**

@@ -3,9 +3,10 @@ package com.example.campus_navigation_backend.domain.nearbyBuilding;
 public record NearbyBuilding(
         Long buildingId,
         String name,
-        double latitude,
-        double longitude,
-        double elevation,
+        String description,
+        double lat,
+        double lon,
+        Double ele,
         double distanceMeters
 
 ) {
@@ -23,19 +24,20 @@ public record NearbyBuilding(
             );
         }
 
-        if (!Double.isFinite(latitude)) {
+        if (!Double.isFinite(lat)) {
             throw new IllegalArgumentException(
                     "latitude must be finite"
             );
         }
 
-        if (!Double.isFinite(longitude)) {
+        if (!Double.isFinite(lon)) {
             throw new IllegalArgumentException(
                     "longitude must be finite"
             );
         }
 
-        if (!Double.isFinite(elevation)) {
+        if (ele != null
+                && !Double.isFinite(ele)) {
             throw new IllegalArgumentException(
                     "elevation must be finite"
             );

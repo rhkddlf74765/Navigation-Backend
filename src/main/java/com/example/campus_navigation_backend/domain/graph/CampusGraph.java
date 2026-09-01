@@ -18,8 +18,11 @@ public final class CampusGraph
     private final Map<Long, PhysicalEdge>
             physicalEdges;
 
-    private final Map<String, BuildingEntrances>
-            buildings;
+    private final Map<Long, BuildingEntrances>
+            buildingsById;
+
+    private final Map<String, Long>
+            buildingIdsByName;
 
     private final double heuristicCostPerMeter;
 
@@ -39,9 +42,14 @@ public final class CampusGraph
                         builder.physicalEdges
                 );
 
-        this.buildings =
+        this.buildingsById =
                 copyBuildings(
-                        builder.buildings
+                        builder.buildingsById
+                );
+
+        this.buildingIdsByName =
+                Map.copyOf(
+                        builder.buildingIdsByName
                 );
 
         this.heuristicCostPerMeter =
@@ -120,12 +128,35 @@ public final class CampusGraph
     }
 
     public List<Long>
+    findEntranceNodeIdsByBuildingId(
+            long buildingId
+    ) {
+        BuildingEntrances entry =
+                buildingsById.get(
+                        buildingId
+                );
+
+        return entry == null
+                ? List.of()
+                : entry.nodeIds();
+    }
+
+    public List<Long>
     findEntranceNodeIdsByBuildingName(
             String buildingName
     ) {
-        BuildingEntrances entry =
-                buildings.get(
+        Long buildingId =
+                buildingIdsByName.get(
                         normalize(buildingName)
+                );
+
+        if (buildingId == null) {
+            return List.of();
+        }
+
+        BuildingEntrances entry =
+                buildingsById.get(
+                        buildingId
                 );
 
         return entry == null
@@ -134,7 +165,7 @@ public final class CampusGraph
     }
 
     public List<String> findBuildingNames() {
-        return buildings.values()
+        return buildingsById.values()
                 .stream()
                 .map(
                         BuildingEntrances::displayName
@@ -243,13 +274,13 @@ public final class CampusGraph
         return Map.copyOf(copied);
     }
 
-    private static Map<String, BuildingEntrances>
+    private static Map<Long, BuildingEntrances>
     copyBuildings(
-            Map<String,
+            Map<Long,
                     MutableBuildingEntrances>
                     source
     ) {
-        Map<String, BuildingEntrances> copied =
+        Map<Long, BuildingEntrances> copied =
                 new LinkedHashMap<>();
 
         source.forEach(
@@ -318,9 +349,13 @@ public final class CampusGraph
                 new LinkedHashMap<>();
 
         private final
-        Map<String,
+        Map<Long,
                 MutableBuildingEntrances>
-                buildings =
+                buildingsById =
+                new LinkedHashMap<>();
+
+        private final Map<String, Long>
+                buildingIdsByName =
                 new LinkedHashMap<>();
 
         public void addNode(
@@ -361,6 +396,7 @@ public final class CampusGraph
         }
 
         public void addBuildingEntrance(
+                long buildingId,
                 String displayName,
                 long nodeId
         ) {
@@ -378,8 +414,8 @@ public final class CampusGraph
             }
 
             MutableBuildingEntrances entry =
-                    buildings.computeIfAbsent(
-                            normalized,
+                    buildingsById.computeIfAbsent(
+                            buildingId,
                             ignored ->
                                     new MutableBuildingEntrances(
                                             displayName.trim()
@@ -393,6 +429,11 @@ public final class CampusGraph
                         nodeId
                 );
             }
+
+            buildingIdsByName.putIfAbsent(
+                    normalized,
+                    buildingId
+            );
         }
 
         public void addPhysicalEdge(

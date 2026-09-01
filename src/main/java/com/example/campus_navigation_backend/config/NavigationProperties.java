@@ -10,6 +10,7 @@ import java.util.List;
 public record NavigationProperties(
         int requestSrid,
         int metricSrid,
+        int buildingSrid,
         double projectionRadiusMeters,
         int projectionMaxCandidates,
         double spatialIndexCellSizeMeters,

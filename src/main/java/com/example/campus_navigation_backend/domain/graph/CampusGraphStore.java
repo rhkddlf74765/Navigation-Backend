@@ -103,6 +103,16 @@ public class CampusGraphStore {
     }
 
     public List<Long>
+    findEntranceNodeIdsByBuildingId(
+            long buildingId
+    ) {
+        return graph()
+                .findEntranceNodeIdsByBuildingId(
+                        buildingId
+                );
+    }
+
+    public List<Long>
     findEntranceNodeIdsByBuildingName(
             String buildingName
     ) {

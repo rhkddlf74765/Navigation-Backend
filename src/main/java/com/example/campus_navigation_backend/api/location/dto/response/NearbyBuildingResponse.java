@@ -9,7 +9,7 @@ public record NearbyBuildingResponse(
         BuildingDescription description,
         double lat,
         double lon,
-        double ele,
+        Double ele,
         double distanceMeters
 ) {
 
@@ -24,9 +24,9 @@ public record NearbyBuildingResponse(
                 // DB description 추가 전까지 null
                 null,
 
-                building.latitude(),
-                building.longitude(),
-                building.elevation(),
+                building.lat(),
+                building.lon(),
+                building.ele(),
                 building.distanceMeters()
         );
     }

@@ -65,9 +65,30 @@ class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
 
         LocationSampleResponse locationResponse = locationSampleService.save(locationRequest);
 
-        assertThat(locationResponse.id()).isNotNull();
-        assertThat(locationResponse.errorMeters()).isGreaterThan(0.0);
-        assertLocationSampleLog(locationResponse.id(), routeResponse.routeSessionId());
+        assertThat(locationResponse.locationRecordedAt()).isNotNull();
+        assertThat(locationResponse.nearbyBuildings()).isNotNull();
+
+        Long locationSampleLogId =
+                findLocationSampleLogId(
+                        routeResponse.routeSessionId()
+                );
+
+        assertThat(locationSampleLogId).isNotNull();
+        assertLocationSampleLog(locationSampleLogId, routeResponse.routeSessionId());
+    }
+
+    private Long findLocationSampleLogId(UUID routeSessionId) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM log.location_sample_log
+                WHERE route_session_id = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                Long.class,
+                routeSessionId
+        );
     }
 
     private void assertRouteSessionLog(UUID routeSessionId) {

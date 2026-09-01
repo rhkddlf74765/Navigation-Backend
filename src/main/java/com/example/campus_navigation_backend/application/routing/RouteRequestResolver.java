@@ -2,14 +2,18 @@ package com.example.campus_navigation_backend.application.routing;
 
 import com.example.campus_navigation_backend.application.dto.RouteEndpointRequest;
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
+import com.example.campus_navigation_backend.domain.building.BuildingRef;
+import com.example.campus_navigation_backend.domain.building.ContainingBuilding;
 import com.example.campus_navigation_backend.domain.geo.CoordinateTransformer;
 import com.example.campus_navigation_backend.domain.geo.GeoPoint;
 import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
 import com.example.campus_navigation_backend.domain.graph.MetricPoint;
 import com.example.campus_navigation_backend.domain.projection.EdgeProjection;
+import com.example.campus_navigation_backend.service.building.BuildingSpatialQueryService;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class RouteRequestResolver {
@@ -22,12 +26,17 @@ public class RouteRequestResolver {
     private final EdgeProjectionFinder
             edgeProjectionFinder;
 
+    private final BuildingSpatialQueryService
+            buildingSpatialQueryService;
+
     public RouteRequestResolver(
             CampusGraphStore campusGraphStore,
             CoordinateTransformer
                     coordinateTransformer,
             EdgeProjectionFinder
-                    edgeProjectionFinder
+                    edgeProjectionFinder,
+            BuildingSpatialQueryService
+                    buildingSpatialQueryService
     ) {
         this.campusGraphStore =
                 campusGraphStore;
@@ -37,6 +46,9 @@ public class RouteRequestResolver {
 
         this.edgeProjectionFinder =
                 edgeProjectionFinder;
+
+        this.buildingSpatialQueryService =
+                buildingSpatialQueryService;
     }
 
     public ResolvedRouteRequest resolve(
@@ -106,26 +118,22 @@ public class RouteRequestResolver {
             );
         }
 
-        List<Long> entranceNodeIds =
-                campusGraphStore
-                        .findEntranceNodeIdsByBuildingName(
+        BuildingRef building =
+                buildingSpatialQueryService
+                        .findByName(
                                 endpoint.buildingName()
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "Building not found: "
+                                                        + endpoint
+                                                        .buildingName()
+                                        )
                         );
 
-        if (entranceNodeIds.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "No building entrance found: "
-                            + endpoint.buildingName()
-            );
-        }
-
-        return new ResolvedRouteEndpoint
-                .Building(
-                endpoint
-                        .buildingName()
-                        .trim(),
-
-                entranceNodeIds
+        return resolveBuildingRef(
+                building
         );
     }
 
@@ -137,6 +145,26 @@ public class RouteRequestResolver {
                 || endpoint.lat() == null) {
             throw new IllegalArgumentException(
                     "Lon and lat are required."
+            );
+        }
+
+        Optional<ContainingBuilding>
+                containingBuilding =
+                buildingSpatialQueryService
+                        .findContaining(
+                                endpoint.lat(),
+                                endpoint.lon()
+                        );
+
+        if (containingBuilding.isPresent()) {
+            ContainingBuilding building =
+                    containingBuilding.get();
+
+            return resolveBuildingRef(
+                    new BuildingRef(
+                            building.id(),
+                            building.name()
+                    )
             );
         }
 
@@ -165,6 +193,30 @@ public class RouteRequestResolver {
                 .Coordinate(
                 metricPoint,
                 projections
+        );
+    }
+
+    private ResolvedRouteEndpoint
+    resolveBuildingRef(
+            BuildingRef building
+    ) {
+        List<Long> entranceNodeIds =
+                campusGraphStore
+                        .findEntranceNodeIdsByBuildingId(
+                                building.id()
+                        );
+
+        if (entranceNodeIds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "No routable entrance found for building: "
+                            + building.name()
+            );
+        }
+
+        return new ResolvedRouteEndpoint
+                .Building(
+                building.name(),
+                entranceNodeIds
         );
     }
 }

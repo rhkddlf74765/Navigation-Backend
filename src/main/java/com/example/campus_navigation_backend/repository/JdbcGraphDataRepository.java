@@ -39,25 +39,40 @@ public class JdbcGraphDataRepository
 
         String sql = """
                 SELECT
-                    id,
-                    node_type,
-                    description,
-                    ST_X(mgeom) AS x,
-                    ST_Y(mgeom) AS y,
-                    COALESCE(ST_Z(mgeom), 0) AS z
-                FROM (
-                    SELECT
-                        id,
-                        node_type,
-                        description,
+                    n.id,
+                    n.node_type,
+                    n.description,
+                    b.id AS building_id,
+                    b.name AS building_name,
+                    ST_X(
                         ST_Transform(
-                            geom,
+                            n.geom,
                             :metricSrid
-                        ) AS mgeom
-                    FROM public.final_nodes_3d
-                    WHERE geom IS NOT NULL
-                ) t
-                ORDER BY id
+                        )
+                    ) AS x,
+                    ST_Y(
+                        ST_Transform(
+                            n.geom,
+                            :metricSrid
+                        )
+                    ) AS y,
+                    COALESCE(
+                        ST_Z(
+                            ST_Transform(
+                                n.geom,
+                                :metricSrid
+                            )
+                        ),
+                        0
+                    ) AS z
+                FROM public.final_nodes_3d n
+                LEFT JOIN public.entrances e
+                  ON LOWER(BTRIM(n.node_type)) = 'entrance'
+                 AND e.id = n.id
+                LEFT JOIN public.buildings b
+                  ON b.id = e.building_id
+                WHERE n.geom IS NOT NULL
+                ORDER BY n.id
                 """;
 
         MapSqlParameterSource params =
@@ -79,6 +94,13 @@ public class JdbcGraphDataRepository
                                 ),
                                 rs.getString(
                                         "description"
+                                ),
+                                rs.getObject(
+                                        "building_id",
+                                        Long.class
+                                ),
+                                rs.getString(
+                                        "building_name"
                                 ),
                                 rs.getDouble("x"),
                                 rs.getDouble("y"),

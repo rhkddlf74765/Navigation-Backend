@@ -7,10 +7,31 @@ public record GraphNodeRow(
         long id,
         String nodeType,
         String description,
+        Long buildingId,
+        String buildingName,
         double x,
         double y,
         double z
 ) {
+    public GraphNodeRow(
+            long id,
+            String nodeType,
+            String description,
+            double x,
+            double y,
+            double z
+    ) {
+        this(
+                id,
+                nodeType,
+                description,
+                null,
+                null,
+                x,
+                y,
+                z
+        );
+    }
 
     public MetricPoint point() {
         return new MetricPoint(
