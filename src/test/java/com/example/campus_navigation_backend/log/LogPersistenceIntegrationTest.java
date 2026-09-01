@@ -19,14 +19,21 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * 실제 PostGIS 테스트 DB에 로그 엔티티가 저장되는지 검증하는 통합 테스트이다.
- */
 @SpringBootTest
-class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
+class LogPersistenceIntegrationTest
+        extends PostgisTestContainerSupport {
 
-    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
+    private static final UUID TEST_USER_ID =
+            UUID.fromString(
+                    "00000000-0000-0000-0000-000000000101"
+            );
+
+    private static final UUID FAILED_ROUTE_USER_ID =
+            UUID.fromString(
+                    "00000000-0000-0000-0000-000000000102"
+            );
 
     @Autowired
     private CampusNavigationFacade campusNavigationFacade;
@@ -37,47 +44,188 @@ class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    /**
-     * 라우팅 성공 로그와 위치 샘플 로그가 log 스키마의 실제 테이블에 저장되는지 확인한다.
-     */
     @Test
-    void savesRouteAndLocationLogsToDatabase() {
-        RouteRequest routeRequest = new RouteRequest(
-                TEST_USER_ID,
-                RouteEndpointRequest.coordinate(0.0002, 0.0001, 0.0),
-                RouteEndpointRequest.building("Test Building")
+    void savesRouteSessionAndLocationSampleLogsToDatabase() {
+        RouteRequest routeRequest =
+                new RouteRequest(
+                        TEST_USER_ID,
+                        RouteEndpointRequest.coordinate(
+                                0.0002,
+                                0.0001,
+                                0.0
+                        ),
+                        RouteEndpointRequest.building(
+                                "Test Building"
+                        )
+                );
+
+        RouteResponse routeResponse =
+                campusNavigationFacade.findRoute(
+                        routeRequest
+                );
+
+        assertRouteSessionLog(
+                routeResponse.routeSessionId()
         );
 
-        RouteResponse routeResponse = campusNavigationFacade.findRoute(routeRequest);
+        LocationSampleRequest locationRequest =
+                new LocationSampleRequest(
+                        TEST_USER_ID,
+                        routeResponse.routeSessionId(),
+                        new LocationCoordinateRequest(
+                                0.00021,
+                                0.00011,
+                                1.0
+                        ),
+                        new LocationCoordinateRequest(
+                                0.00020,
+                                0.00010,
+                                1.5
+                        ),
+                        Instant.parse(
+                                "2026-07-09T01:00:00Z"
+                        )
+                );
 
-        assertRouteSessionLog(routeResponse.routeSessionId());
-        assertRouteEndpointLogs(routeResponse.routeSessionId());
-        assertRouteResultLog(routeResponse.routeSessionId());
-        assertRouteEventLog(routeResponse.routeSessionId());
+        LocationSampleResponse locationResponse =
+                locationSampleService.save(
+                        locationRequest
+                );
 
-        LocationSampleRequest locationRequest = new LocationSampleRequest(
-                TEST_USER_ID,
-                routeResponse.routeSessionId(),
-                new LocationCoordinateRequest(0.00021, 0.00011, 1.0),
-                new LocationCoordinateRequest(0.00020, 0.00010, 1.5),
-                Instant.parse("2026-07-09T01:00:00Z")
-        );
-
-        LocationSampleResponse locationResponse = locationSampleService.save(locationRequest);
-
-        assertThat(locationResponse.locationRecordedAt()).isNotNull();
-        assertThat(locationResponse.nearbyBuildings()).isNotNull();
+        assertThat(locationResponse.locationRecordedAt())
+                .isNotNull();
+        assertThat(locationResponse.nearbyBuildings())
+                .isNotNull();
 
         Long locationSampleLogId =
                 findLocationSampleLogId(
                         routeResponse.routeSessionId()
                 );
 
-        assertThat(locationSampleLogId).isNotNull();
-        assertLocationSampleLog(locationSampleLogId, routeResponse.routeSessionId());
+        assertThat(locationSampleLogId)
+                .isNotNull();
+        assertLocationSampleLog(
+                locationSampleLogId,
+                routeResponse.routeSessionId()
+        );
     }
 
-    private Long findLocationSampleLogId(UUID routeSessionId) {
+    @Test
+    void savesFailedRouteStateToRouteSessionLog() {
+        RouteRequest routeRequest =
+                new RouteRequest(
+                        FAILED_ROUTE_USER_ID,
+                        RouteEndpointRequest.building(
+                                "Test Building"
+                        ),
+                        RouteEndpointRequest.building(
+                                "Missing Building"
+                        )
+                );
+
+        assertThatThrownBy(
+                () ->
+                        campusNavigationFacade.findRoute(
+                                routeRequest
+                        )
+        ).isInstanceOf(
+                IllegalArgumentException.class
+        );
+
+        Map<String, Object> row =
+                jdbcTemplate.queryForMap(
+                        """
+                        SELECT status,
+                               end_reason,
+                               requested_at,
+                               responded_at,
+                               ended_at,
+                               request_json::text AS request_json,
+                               error_message
+                        FROM log.route_session_log
+                        WHERE user_id = ?
+                        ORDER BY requested_at DESC
+                        LIMIT 1
+                        """,
+                        FAILED_ROUTE_USER_ID
+                );
+
+        assertThat(row.get("status"))
+                .isEqualTo("ROUTE_FAILED");
+        assertThat(row.get("end_reason"))
+                .isEqualTo("ERROR");
+        assertThat(row.get("requested_at"))
+                .isNotNull();
+        assertThat(row.get("responded_at"))
+                .isNotNull();
+        assertThat(row.get("ended_at"))
+                .isNotNull();
+        assertThat((String) row.get("request_json"))
+                .contains(
+                        "Missing Building"
+                );
+        assertThat(row.get("error_message"))
+                .isNotNull();
+    }
+
+    private void assertRouteSessionLog(
+            UUID routeSessionId
+    ) {
+        Map<String, Object> row =
+                jdbcTemplate.queryForMap(
+                        """
+                        SELECT user_id,
+                               status,
+                               requested_at,
+                               responded_at,
+                               expected_time_seconds,
+                               request_json::text AS request_json,
+                               total_distance_meters,
+                               total_cost,
+                               path_json::text AS path_json
+                        FROM log.route_session_log
+                        WHERE route_session_id = ?
+                        """,
+                        routeSessionId
+                );
+
+        assertThat(row.get("user_id"))
+                .isEqualTo(TEST_USER_ID);
+        assertThat(row.get("status"))
+                .isEqualTo("ROUTE_RETURNED");
+        assertThat(row.get("requested_at"))
+                .isNotNull();
+        assertThat(row.get("responded_at"))
+                .isNotNull();
+        assertThat(row.get("request_json"))
+                .isNotNull();
+        assertThat((String) row.get("request_json"))
+                .contains(
+                        "start",
+                        "destination",
+                        "Test Building"
+                );
+        assertThat((Double) row.get("total_distance_meters"))
+                .isGreaterThan(0.0);
+        assertThat((Double) row.get("total_cost"))
+                .isGreaterThan(0.0);
+        assertThat(
+                ((Number) row.get("expected_time_seconds"))
+                        .longValue()
+        ).isGreaterThanOrEqualTo(0L);
+        assertThat(row.get("path_json"))
+                .isNotNull();
+        assertThat((String) row.get("path_json"))
+                .contains(
+                        "lon",
+                        "lat",
+                        "ele"
+                );
+    }
+
+    private Long findLocationSampleLogId(
+            UUID routeSessionId
+    ) {
         return jdbcTemplate.queryForObject(
                 """
                 SELECT id
@@ -91,119 +239,51 @@ class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
         );
     }
 
-    private void assertRouteSessionLog(UUID routeSessionId) {
-        Map<String, Object> row = jdbcTemplate.queryForMap(
-                """
-                SELECT user_id, status, requested_at, responded_at
-                FROM log.route_session_log
-                WHERE route_session_id = ?
-                """,
-                routeSessionId
-        );
+    private void assertLocationSampleLog(
+            Long id,
+            UUID routeSessionId
+    ) {
+        Map<String, Object> row =
+                jdbcTemplate.queryForMap(
+                        """
+                        SELECT user_id,
+                               route_session_id,
+                               gps_lon,
+                               gps_lat,
+                               gps_ele,
+                               actual_lon,
+                               actual_lat,
+                               actual_ele,
+                               error_meters,
+                               recorded_at,
+                               received_at
+                        FROM log.location_sample_log
+                        WHERE id = ?
+                        """,
+                        id
+                );
 
-        assertThat(row.get("user_id")).isEqualTo(TEST_USER_ID);
-        assertThat(row.get("status")).isEqualTo("ROUTE_RETURNED");
-        assertThat(row.get("requested_at")).isNotNull();
-        assertThat(row.get("responded_at")).isNotNull();
-    }
-
-    private void assertRouteEndpointLogs(UUID routeSessionId) {
-        Integer endpointCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM log.route_endpoint_log WHERE route_session_id = ?",
-                Integer.class,
-                routeSessionId
-        );
-        assertThat(endpointCount).isEqualTo(2);
-
-        Map<String, Object> start = jdbcTemplate.queryForMap(
-                """
-                SELECT endpoint_type, lon, lat, ele
-                FROM log.route_endpoint_log
-                WHERE route_session_id = ? AND role = 'START'
-                """,
-                routeSessionId
-        );
-        assertThat(start.get("endpoint_type")).isEqualTo("COORDINATE");
-        assertThat(start.get("lon")).isEqualTo(0.0002);
-        assertThat(start.get("lat")).isEqualTo(0.0001);
-        assertThat(start.get("ele")).isEqualTo(0.0);
-
-        Map<String, Object> destination = jdbcTemplate.queryForMap(
-                """
-                SELECT endpoint_type, building_name
-                FROM log.route_endpoint_log
-                WHERE route_session_id = ? AND role = 'DESTINATION'
-                """,
-                routeSessionId
-        );
-        assertThat(destination.get("endpoint_type")).isEqualTo("BUILDING");
-        assertThat(destination.get("building_name")).isEqualTo("Test Building");
-    }
-
-    private void assertRouteResultLog(UUID routeSessionId) {
-        Map<String, Object> row = jdbcTemplate.queryForMap(
-                """
-                SELECT destination_building_name,
-                       selected_entrance_graph_node_id,
-                       total_distance_meters,
-                       total_cost,
-                       approach_distance_meters,
-                       approach_cost,
-                       graph_distance_meters,
-                       graph_cost,
-                       path::text AS path
-                FROM log.route_result_log
-                WHERE route_session_id = ?
-                """,
-                routeSessionId
-        );
-
-        assertThat(row.get("destination_building_name")).isEqualTo("Test Building");
-        assertThat(row.get("selected_entrance_graph_node_id")).isNotNull();
-        assertThat((Double) row.get("total_distance_meters")).isGreaterThan(0.0);
-        assertThat((Double) row.get("total_cost")).isGreaterThan(0.0);
-        assertThat((Double) row.get("approach_distance_meters")).isGreaterThanOrEqualTo(0.0);
-        assertThat((Double) row.get("approach_cost")).isGreaterThanOrEqualTo(0.0);
-        assertThat((Double) row.get("graph_distance_meters")).isGreaterThanOrEqualTo(0.0);
-        assertThat((Double) row.get("graph_cost")).isGreaterThanOrEqualTo(0.0);
-        assertThat((String) row.get("path")).contains("lon", "lat", "ele");
-    }
-
-    private void assertRouteEventLog(UUID routeSessionId) {
-        Map<String, Object> row = jdbcTemplate.queryForMap(
-                """
-                SELECT user_id, event_type
-                FROM log.route_event_log
-                WHERE route_session_id = ?
-                """,
-                routeSessionId
-        );
-
-        assertThat(row.get("user_id")).isEqualTo(TEST_USER_ID);
-        assertThat(row.get("event_type")).isEqualTo("ROUTE_RETURNED");
-    }
-
-    private void assertLocationSampleLog(Long id, UUID routeSessionId) {
-        Map<String, Object> row = jdbcTemplate.queryForMap(
-                """
-                SELECT user_id, route_session_id, gps_lon, gps_lat, gps_ele,
-                       actual_lon, actual_lat, actual_ele, error_meters, recorded_at, received_at
-                FROM log.location_sample_log
-                WHERE id = ?
-                """,
-                id
-        );
-
-        assertThat(row.get("user_id")).isEqualTo(TEST_USER_ID);
-        assertThat(row.get("route_session_id")).isEqualTo(routeSessionId);
-        assertThat(row.get("gps_lon")).isEqualTo(0.00021);
-        assertThat(row.get("gps_lat")).isEqualTo(0.00011);
-        assertThat(row.get("gps_ele")).isEqualTo(1.0);
-        assertThat(row.get("actual_lon")).isEqualTo(0.00020);
-        assertThat(row.get("actual_lat")).isEqualTo(0.00010);
-        assertThat(row.get("actual_ele")).isEqualTo(1.5);
-        assertThat((Double) row.get("error_meters")).isGreaterThan(0.0);
-        assertThat(row.get("recorded_at")).isNotNull();
-        assertThat(row.get("received_at")).isNotNull();
+        assertThat(row.get("user_id"))
+                .isEqualTo(TEST_USER_ID);
+        assertThat(row.get("route_session_id"))
+                .isEqualTo(routeSessionId);
+        assertThat(row.get("gps_lon"))
+                .isEqualTo(0.00021);
+        assertThat(row.get("gps_lat"))
+                .isEqualTo(0.00011);
+        assertThat(row.get("gps_ele"))
+                .isEqualTo(1.0);
+        assertThat(row.get("actual_lon"))
+                .isEqualTo(0.00020);
+        assertThat(row.get("actual_lat"))
+                .isEqualTo(0.00010);
+        assertThat(row.get("actual_ele"))
+                .isEqualTo(1.5);
+        assertThat((Double) row.get("error_meters"))
+                .isGreaterThan(0.0);
+        assertThat(row.get("recorded_at"))
+                .isNotNull();
+        assertThat(row.get("received_at"))
+                .isNotNull();
     }
 }

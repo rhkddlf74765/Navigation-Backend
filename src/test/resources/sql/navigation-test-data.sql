@@ -109,56 +109,13 @@ CREATE TABLE log.route_session_log (
     end_reason varchar(30),
     requested_at timestamptz NOT NULL DEFAULT now(),
     responded_at timestamptz,
-    navigation_started_at timestamptz,
     ended_at timestamptz,
-    error_message text
-);
-
-CREATE TABLE log.route_endpoint_log (
-    id bigserial PRIMARY KEY,
-    route_session_id uuid NOT NULL,
-    role varchar(20) NOT NULL,
-    endpoint_type varchar(30) NOT NULL,
-    lon double precision,
-    lat double precision,
-    ele double precision,
-    building_name text,
-    CONSTRAINT route_endpoint_unique_role UNIQUE (route_session_id, role),
-    CONSTRAINT route_endpoint_session_fk
-        FOREIGN KEY (route_session_id)
-        REFERENCES log.route_session_log(route_session_id)
-);
-
-CREATE TABLE log.route_result_log (
-    route_session_id uuid PRIMARY KEY,
-    destination_building_name text,
-    selected_entrance_graph_node_id bigint,
-    total_distance_meters double precision NOT NULL,
-    total_cost double precision NOT NULL,
-    approach_distance_meters double precision NOT NULL,
-    approach_cost double precision NOT NULL,
-    graph_distance_meters double precision NOT NULL,
-    graph_cost double precision NOT NULL,
-    path jsonb NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT route_result_session_fk
-        FOREIGN KEY (route_session_id)
-        REFERENCES log.route_session_log(route_session_id)
-);
-
-CREATE TABLE log.route_event_log (
-    id bigserial PRIMARY KEY,
-    route_session_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    event_type varchar(50) NOT NULL,
-    event_message text,
-    lon double precision,
-    lat double precision,
-    ele double precision,
-    occurred_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT route_event_session_fk
-        FOREIGN KEY (route_session_id)
-        REFERENCES log.route_session_log(route_session_id)
+    expected_time_seconds bigint,
+    error_message text,
+    request_json jsonb,
+    total_distance_meters double precision,
+    total_cost double precision,
+    path_json jsonb
 );
 
 CREATE TABLE log.location_sample_log (
@@ -175,18 +132,6 @@ CREATE TABLE log.location_sample_log (
     recorded_at timestamptz,
     received_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT location_sample_route_session_fk
-        FOREIGN KEY (route_session_id)
-        REFERENCES log.route_session_log(route_session_id)
-);
-
-CREATE TABLE log.route_arrival_log (
-    route_session_id uuid PRIMARY KEY,
-    user_id uuid NOT NULL,
-    arrived_at timestamptz NOT NULL,
-    lon double precision,
-    lat double precision,
-    ele double precision,
-    CONSTRAINT route_arrival_session_fk
         FOREIGN KEY (route_session_id)
         REFERENCES log.route_session_log(route_session_id)
 );
