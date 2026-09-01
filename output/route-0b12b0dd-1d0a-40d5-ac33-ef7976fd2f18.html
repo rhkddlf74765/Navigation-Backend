@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Route Debug Visualizer
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
+    <style>
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        #info-panel {
+
+            position: absolute;
+
+            top: 20px;
+            left: 60px;
+
+            z-index: 1000;
+
+            background: rgba(
+                255,
+                255,
+                255,
+                0.96
+            );
+
+            padding: 16px;
+
+            border-radius: 10px;
+
+            box-shadow:
+                0 2px 12px
+                rgba(0, 0, 0, 0.2);
+
+            font-family:
+                Arial,
+                sans-serif;
+
+            font-size: 14px;
+
+            line-height: 1.6;
+
+            min-width: 320px;
+        }
+
+        #info-panel h3 {
+            margin:
+                0
+                0
+                10px
+                0;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div id="info-panel">
+
+        <h3>
+            Route Debug
+        </h3>
+
+        <div>
+            <span class="label">
+                Route Session
+            </span>
+            <br>
+            0b12b0dd-1d0a-40d5-ac33-ef7976fd2f18
+        </div>
+
+        <div>
+            <span class="label">
+                Status:
+            </span>
+            ROUTE_RETURNED
+        </div>
+
+        <br>
+
+        <div>
+            <span class="label">
+                DB Distance:
+            </span>
+            437.65 m
+        </div>
+
+        <div>
+            <span class="label">
+                Calculated Path Distance:
+            </span>
+            443.90 m
+        </div>
+
+        <div>
+            <span class="label">
+                Distance Difference:
+            </span>
+            6.25 m
+        </div>
+
+        <div>
+            <span class="label">
+                Total Cost:
+            </span>
+            582.848
+        </div>
+
+        <div>
+            <span class="label">
+                Expected Time:
+            </span>
+            -
+        </div>
+
+        <div>
+            <span class="label">
+                Path Points:
+            </span>
+            46
+        </div>
+
+        <br>
+
+        <div>
+            Request Start = red
+        </div>
+
+        <div>
+            Request Destination = green
+        </div>
+
+        <div>
+            Path Start = blue
+        </div>
+
+        <div>
+            Path End = purple
+        </div>
+
+    </div>
+
+
+    <div id="map"></div>
+
+
+    <script>
+
+        const route =
+            [
+    [37.5569, 127.0439],
+    [37.55684864134713, 127.04358632225478],
+    [37.5567393029982, 127.04361456865914],
+    [37.55671503178002, 127.04364805676508],
+    [37.55636150361539, 127.04373887631068],
+    [37.55625273115761, 127.0437752632982],
+    [37.556184539559254, 127.04385362262788],
+    [37.55618438725745, 127.04385388996687],
+    [37.55617955234738, 127.0438620330926],
+    [37.556179397228675, 127.04387909612477],
+    [37.55617782300409, 127.04390598448094],
+    [37.55617478743515, 127.04393204805842],
+    [37.556170782710474, 127.04395821116347],
+    [37.55616456142971, 127.0439881326357],
+    [37.55615654722706, 127.04402667722984],
+    [37.55615106024598, 127.04405285738747],
+    [37.55613573720242, 127.04407155638451],
+    [37.55613001900295, 127.04407141529508],
+    [37.55609646481988, 127.04407784524426],
+    [37.55606660984701, 127.04407072779836],
+    [37.55605229465227, 127.04405866090438],
+    [37.555968400000204, 127.0439148],
+    [37.55592260000018, 127.04409969999999],
+    [37.55585720000018, 127.0442096],
+    [37.55575760000017, 127.04434359999999],
+    [37.55561960000016, 127.0445024],
+    [37.55558540000019, 127.04456090000001],
+    [37.555560200000166, 127.04453720000001],
+    [37.555523000000164, 127.04450149999998],
+    [37.555459200000165, 127.04451220000001],
+    [37.555399700000194, 127.04450410000001],
+    [37.55535709473056, 127.04449284375517],
+    [37.55484330000018, 127.04435710000001],
+    [37.55471790000018, 127.0443302],
+    [37.55466040000018, 127.04432490000002],
+    [37.55462000000018, 127.0443383],
+    [37.554566900000175, 127.0443705],
+    [37.55455840000018, 127.04441349999999],
+    [37.55454560000017, 127.04448850000001],
+    [37.55463490000017, 127.0445475],
+    [37.55469660000017, 127.0446146],
+    [37.55473700000018, 127.04471110000001],
+    [37.55475610000018, 127.0448238],
+    [37.55467446257066, 127.0451404851954],
+    [37.55465590000017, 127.04513569999999],
+    [37.554500000000004, 127.0452]
+];
+
+
+        const map =
+            L.map(
+                'map'
+            ).setView(
+                [
+                    37.556900000000,
+                    127.043900000000
+                ],
+                18
+            );
+
+
+        L.tileLayer(
+            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            {
+                maxZoom: 20,
+
+                attribution:
+                    '&copy; OpenStreetMap contributors'
+            }
+        ).addTo(map);
+
+
+        const routeLine =
+            L.polyline(
+                route,
+                {
+                    color: '#1565c0',
+                    weight: 6,
+                    opacity: 0.9
+                }
+            ).addTo(map);
+
+
+        L.circleMarker(
+    [
+        37.556900000000,
+        127.043900000000
+    ],
+    {
+        radius: 9,
+        color: '#e53935',
+        fillColor: '#e53935',
+        fillOpacity: 1
+    }
+)
+.addTo(map)
+.bindPopup('Request Start');
+
+
+        L.circleMarker(
+    [
+        37.554500000000,
+        127.045200000000
+    ],
+    {
+        radius: 9,
+        color: '#43a047',
+        fillColor: '#43a047',
+        fillOpacity: 1
+    }
+)
+.addTo(map)
+.bindPopup('Request Destination');
+
+
+
+        L.circleMarker(
+            [
+                37.556900000000,
+                127.043900000000
+            ],
+            {
+                radius: 8,
+                color: '#0d47a1',
+                fillColor: '#2196f3',
+                fillOpacity: 1
+            }
+        )
+        .addTo(map)
+        .bindPopup(
+            'Path Start'
+        );
+
+
+        L.circleMarker(
+            [
+                37.554500000000,
+                127.045200000000
+            ],
+            {
+                radius: 8,
+                color: '#4a148c',
+                fillColor: '#9c27b0',
+                fillOpacity: 1
+            }
+        )
+        .addTo(map)
+        .bindPopup(
+            'Path End'
+        );
+
+
+        route.forEach(
+            (point, index) => {
+
+                L.circleMarker(
+                    point,
+                    {
+                        radius: 2,
+                        weight: 1,
+                        opacity: 0.6,
+                        fillOpacity: 0.6
+                    }
+                )
+                .addTo(map)
+                .bindTooltip(
+                    'Path #' + index
+                    + '<br>'
+                    + point[0].toFixed(7)
+                    + ', '
+                    + point[1].toFixed(7)
+                );
+            }
+        );
+
+
+        const bounds =
+            routeLine.getBounds();
+
+
+        map.fitBounds(
+            bounds,
+            {
+                padding: [
+                    40,
+                    40
+                ]
+            }
+        );
+
+    </script>
+
+</body>
+
+</html>

@@ -1,8 +1,8 @@
 package com.example.campus_navigation_backend.service.location;
 
-import com.example.campus_navigation_backend.api.location.dto.LocationCoordinateRequest;
-import com.example.campus_navigation_backend.api.location.dto.LocationSampleRequest;
-import com.example.campus_navigation_backend.api.location.dto.LocationSampleResponse;
+import com.example.campus_navigation_backend.api.location.dto.request.LocationCoordinateRequest;
+import com.example.campus_navigation_backend.api.location.dto.request.LocationSampleRequest;
+import com.example.campus_navigation_backend.api.location.dto.response.LocationSampleResponse;
 import com.example.campus_navigation_backend.log.service.LocationLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

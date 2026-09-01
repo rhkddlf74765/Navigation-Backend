@@ -9,15 +9,11 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnTransformer;
 
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * 라우팅 요청 1회의 생명주기와 상태를 저장하는 로그 엔티티이다.
- * <p>
- * 경로 요청 접수, 경로 반환, 안내 시작, 도착, 실패와 같은 세션 수준 상태를 기록한다.
- */
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -45,68 +41,135 @@ public class RouteSessionLogEntity {
     @Column(name = "responded_at")
     private Instant respondedAt;
 
-    @Column(name = "navigation_started_at")
-    private Instant navigationStartedAt;
-
     @Column(name = "ended_at")
     private Instant endedAt;
+
+    @Column(name = "expected_time_seconds")
+    private Long expectedTimeSeconds;
 
     @Column(name = "error_message")
     private String errorMessage;
 
-    private RouteSessionLogEntity(UUID routeSessionId, UUID userId, Instant requestedAt) {
+    /*
+     * 클라이언트가 전달한 RouteRequest 원본.
+     */
+    @ColumnTransformer(
+            read = "request_json::text",
+            write = "?::jsonb"
+    )
+    @Column(
+            name = "request_json",
+            columnDefinition = "jsonb"
+    )
+    private String requestJson;
+
+    /*
+     * 실제 이동 거리.
+     */
+    @Column(name = "total_distance_meters")
+    private Double totalDistanceMeters;
+
+    /*
+     * A* 및 EdgeCostPolicy가 사용한 전체 routing cost.
+     */
+    @Column(name = "total_cost")
+    private Double totalCost;
+
+    /*
+     * 최종적으로 클라이언트에 반환한 RoutePoint 배열.
+     */
+    @ColumnTransformer(
+            read = "path_json::text",
+            write = "?::jsonb"
+    )
+    @Column(
+            name = "path_json",
+            columnDefinition = "jsonb"
+    )
+    private String pathJson;
+
+    private RouteSessionLogEntity(
+            UUID routeSessionId,
+            UUID userId,
+            Instant requestedAt,
+            String requestJson
+    ) {
         this.routeSessionId = routeSessionId;
         this.userId = userId;
         this.status = RouteSessionStatus.REQUESTED;
         this.requestedAt = requestedAt;
+        this.requestJson = requestJson;
     }
 
-    public static RouteSessionLogEntity requested(UUID routeSessionId, UUID userId, Instant requestedAt) {
-        return new RouteSessionLogEntity(routeSessionId, userId, requestedAt);
+    public static RouteSessionLogEntity requested(
+            UUID routeSessionId,
+            UUID userId,
+            Instant requestedAt,
+            String requestJson
+    ) {
+        return new RouteSessionLogEntity(
+                routeSessionId,
+                userId,
+                requestedAt,
+                requestJson
+        );
     }
 
-    /**
-     * 경로 계산이 성공적으로 끝났음을 기록한다.
-     *
-     * @param respondedAt 경로 응답이 생성된 시각
-     */
-    public void markRouteReturned(Instant respondedAt) {
+    public void markRouteReturned(
+            double totalDistanceMeters,
+            double totalCost,
+            long expectedTimeSeconds,
+            String pathJson,
+            Instant respondedAt
+    ) {
         this.status = RouteSessionStatus.ROUTE_RETURNED;
         this.respondedAt = respondedAt;
+
+        this.totalDistanceMeters = totalDistanceMeters;
+        this.totalCost = totalCost;
+        this.expectedTimeSeconds = expectedTimeSeconds;
+        this.pathJson = pathJson;
+
+        this.errorMessage = null;
     }
 
-    /**
-     * 경로 계산 실패 상태와 실패 메시지를 기록한다.
-     *
-     * @param errorMessage 실패 원인 메시지
-     * @param respondedAt 실패 응답이 생성된 시각
-     */
-    public void markRouteFailed(String errorMessage, Instant respondedAt) {
+    public void markRouteFailed(
+            String errorMessage,
+            Instant respondedAt
+    ) {
         this.status = RouteSessionStatus.ROUTE_FAILED;
         this.errorMessage = errorMessage;
+
         this.respondedAt = respondedAt;
         this.endedAt = respondedAt;
         this.endReason = RouteEndReason.ERROR;
     }
 
-    /**
-     * 사용자가 반환된 경로 안내를 시작했음을 기록한다.
-     *
-     * @param startedAt 안내 시작 시각
-     */
-    public void startNavigation(Instant startedAt) {
+    public void startNavigation() {
         this.status = RouteSessionStatus.NAVIGATING;
-        this.navigationStartedAt = startedAt;
     }
 
-    /**
-     * 목적지 도착으로 라우팅 세션이 종료되었음을 기록한다.
-     *
-     * @param arrivedAt 도착 확정 시각
-     */
-    public void markArrived(Instant arrivedAt) {
+    public void markArrived(
+            Instant arrivedAt
+    ) {
         this.status = RouteSessionStatus.ARRIVED;
         this.endedAt = arrivedAt;
         this.endReason = RouteEndReason.ARRIVED;
+    }
+
+    public void markCancelled(
+            Instant cancelledAt
+    ) {
+        this.status = RouteSessionStatus.CANCELLED;
+        this.endedAt = cancelledAt;
+        this.endReason = RouteEndReason.USER_CANCELLED;
+    }
+
+    public void markExpired(
+            Instant expiredAt
+    ) {
+        this.status = RouteSessionStatus.EXPIRED;
+        this.endedAt = expiredAt;
+        this.endReason = RouteEndReason.TIMEOUT;
     }
 }

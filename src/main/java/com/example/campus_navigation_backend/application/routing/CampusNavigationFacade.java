@@ -64,43 +64,30 @@ public class CampusNavigationFacade {
     public RouteResponse findRoute(
             RouteRequest request
     ) {
+
         UUID routeSessionId =
                 UUID.randomUUID();
 
         Instant requestedAt =
                 Instant.now();
 
-        try {
-            ResolvedRouteRequest
-                    resolvedRequest =
-                    routeRequestResolver
-                            .resolve(
-                                    request
-                            );
+        routeLogService.saveRouteRequested(
+                routeSessionId,
+                request,
+                requestedAt
+        );
 
-            RouteResponse zeroRoute =
-                    zeroRouteIfSameCoordinate(
-                            routeSessionId,
-                            resolvedRequest
+        try {
+
+            ResolvedRouteRequest resolvedRequest =
+                    routeRequestResolver.resolve(
+                            request
                     );
 
-            if (zeroRoute != null) {
-                routeLogService
-                        .saveRouteReturned(
-                                request,
-                                zeroRoute,
-                                requestedAt,
-                                Instant.now()
-                        );
-
-                return zeroRoute;
-            }
-
             RoutingOverlay overlay =
-                    routingOverlayFactory
-                            .create(
-                                    resolvedRequest
-                            );
+                    routingOverlayFactory.create(
+                            resolvedRequest
+                    );
 
             PathResult result =
                     pathFinder.findPath(
@@ -111,37 +98,63 @@ public class CampusNavigationFacade {
 
             if (!result.found()) {
                 throw new IllegalStateException(
-                        "No reachable route found."
+                        "Route not found."
                 );
             }
 
-            RouteResponse response =
-                    toResponse(
-                            routeSessionId,
-                            resolvedRequest,
-                            result
+            List<RoutePoint> routePoints =
+                    result.pathPoints()
+                            .stream()
+                            .map(
+                                    coordinateTransformer::toWgs84
+                            )
+                            .map(
+                                    point ->
+                                            new RoutePoint(
+                                                    point.lon(),
+                                                    point.lat(),
+                                                    point.ele()
+                                            )
+                            )
+                            .toList();
+
+            double totalDistanceMeters =
+                    result.totalDistanceMeters();
+
+            double totalCost =
+                    result.totalCost();
+
+            RouteExpectedTime expectedTime =
+                    RouteExpectedTime.fromDistance(
+                            totalDistanceMeters
                     );
 
-            routeLogService
-                    .saveRouteReturned(
-                            request,
-                            response,
-                            requestedAt,
-                            Instant.now()
-                    );
+            Instant respondedAt =
+                    Instant.now();
 
-            return response;
+            routeLogService.saveRouteReturned(
+                    routeSessionId,
+                    totalDistanceMeters,
+                    totalCost,
+                    expectedTime.seconds(),
+                    routePoints,
+                    respondedAt
+            );
+
+            return new RouteResponse(
+                    routeSessionId,
+                    totalDistanceMeters,
+                    expectedTime,
+                    routePoints
+            );
 
         } catch (RuntimeException exception) {
 
-            routeLogService
-                    .saveRouteFailed(
-                            request,
-                            routeSessionId,
-                            requestedAt,
-                            Instant.now(),
-                            exception
-                    );
+            routeLogService.saveRouteFailed(
+                    routeSessionId,
+                    Instant.now(),
+                    exception
+            );
 
             throw exception;
         }
@@ -180,18 +193,11 @@ public class CampusNavigationFacade {
 
         return new RouteResponse(
                 routeSessionId,
-                null,
-                null,
-                0.0,
                 0.0,
                 RouteExpectedTime
                         .fromDistance(
                                 0.0
                         ),
-                0.0,
-                0.0,
-                0.0,
-                0.0,
                 List.of(
                         toRoutePoint(point)
                 )
@@ -223,34 +229,10 @@ public class CampusNavigationFacade {
 
         return new RouteResponse(
                 routeSessionId,
-
-                request
-                        .destination()
-                        .displayName(),
-
-                selectedEntranceId,
-
-                result
-                        .totalDistanceMeters(),
-
-                result.totalCost(),
-
-                RouteExpectedTime
-                        .fromDistance(
-                                result
-                                        .totalDistanceMeters()
-                        ),
-
-                result
-                        .approachDistanceMeters(),
-
-                result.approachCost(),
-
-                result
-                        .graphDistanceMeters(),
-
-                result.graphCost(),
-
+                result.totalDistanceMeters(),
+                RouteExpectedTime.fromDistance(
+                        result.totalDistanceMeters()
+                ),
                 path
         );
     }

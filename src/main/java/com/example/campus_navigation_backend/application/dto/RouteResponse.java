@@ -5,15 +5,8 @@ import java.util.UUID;
 
 public record RouteResponse(
         UUID routeSessionId,
-        String destinationBuildingName,
-        Long selectedEntranceId,
         double totalDistanceMeters,
-        double totalCost,
         RouteExpectedTime expectedTime,
-        double approachDistanceMeters,
-        double approachCost,
-        double graphDistanceMeters,
-        double graphCost,
         List<RoutePoint> path
 ) {
     public RouteResponse {

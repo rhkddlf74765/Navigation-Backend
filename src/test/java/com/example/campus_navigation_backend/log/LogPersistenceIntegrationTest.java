@@ -1,8 +1,8 @@
 package com.example.campus_navigation_backend.log;
 
-import com.example.campus_navigation_backend.api.location.dto.LocationCoordinateRequest;
-import com.example.campus_navigation_backend.api.location.dto.LocationSampleRequest;
-import com.example.campus_navigation_backend.api.location.dto.LocationSampleResponse;
+import com.example.campus_navigation_backend.api.location.dto.request.LocationCoordinateRequest;
+import com.example.campus_navigation_backend.api.location.dto.request.LocationSampleRequest;
+import com.example.campus_navigation_backend.api.location.dto.response.LocationSampleResponse;
 import com.example.campus_navigation_backend.application.dto.RouteEndpointRequest;
 import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;

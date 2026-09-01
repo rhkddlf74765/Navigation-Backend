@@ -1,7 +1,7 @@
 package com.example.campus_navigation_backend.log.service;
 
-import com.example.campus_navigation_backend.api.location.dto.LocationCoordinateRequest;
-import com.example.campus_navigation_backend.api.location.dto.LocationSampleRequest;
+import com.example.campus_navigation_backend.api.location.dto.request.LocationCoordinateRequest;
+import com.example.campus_navigation_backend.api.location.dto.request.LocationSampleRequest;
 import com.example.campus_navigation_backend.log.domain.LocationSampleLogEntity;
 import com.example.campus_navigation_backend.log.domain.PointLog;
 import com.example.campus_navigation_backend.log.repository.LocationSampleLogRepository;

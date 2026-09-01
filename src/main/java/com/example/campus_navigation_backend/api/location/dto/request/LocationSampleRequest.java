@@ -1,4 +1,4 @@
-package com.example.campus_navigation_backend.api.location.dto;
+package com.example.campus_navigation_backend.api.location.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;

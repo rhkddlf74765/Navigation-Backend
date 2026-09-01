@@ -1,10 +1,11 @@
 package com.example.campus_navigation_backend.api.location;
 
-import com.example.campus_navigation_backend.api.location.dto.LocationSampleRequest;
-import com.example.campus_navigation_backend.api.location.dto.LocationSampleResponse;
+import com.example.campus_navigation_backend.api.location.dto.request.LocationSampleRequest;
+import com.example.campus_navigation_backend.api.location.dto.response.LocationSampleResponse;
 import com.example.campus_navigation_backend.service.location.LocationSampleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,8 +27,10 @@ public class LocationSampleController {
      * 위치 샘플 저장 요청을 응용 서비스에 위임하고 저장된 로그 식별자와 계산된 오차를 반환한다.
      */
     @PostMapping
-    public LocationSampleResponse save(@Valid @RequestBody LocationSampleRequest request) {
-        System.out.println(request.gps());
-        return locationSampleService.save(request);
+    public ResponseEntity<LocationSampleResponse> save(@Valid @RequestBody LocationSampleRequest request) {
+
+        LocationSampleResponse response = locationSampleService.save(request);
+
+        return ResponseEntity.ok(response);
     }
 }
