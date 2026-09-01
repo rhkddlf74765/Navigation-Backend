@@ -6,7 +6,6 @@ import com.example.campus_navigation_backend.application.dto.RouteRequest;
 import com.example.campus_navigation_backend.application.dto.RouteResponse;
 import com.example.campus_navigation_backend.domain.geo.CoordinateTransformer;
 import com.example.campus_navigation_backend.domain.geo.GeoPoint;
-import com.example.campus_navigation_backend.domain.graph.RoutingArc;
 import com.example.campus_navigation_backend.domain.path.PathFinder;
 import com.example.campus_navigation_backend.domain.path.PathResult;
 import com.example.campus_navigation_backend.domain.routing.RoutingOverlay;
@@ -209,12 +208,6 @@ public class CampusNavigationFacade {
             ResolvedRouteRequest request,
             PathResult result
     ) {
-        Long selectedEntranceId =
-                selectedDestinationEntranceId(
-                        request.destination(),
-                        result
-                );
-
         List<RoutePoint> path =
                 result.pathPoints()
                         .stream()
@@ -235,39 +228,6 @@ public class CampusNavigationFacade {
                 ),
                 path
         );
-    }
-
-    private Long
-    selectedDestinationEntranceId(
-            ResolvedRouteEndpoint destination,
-            PathResult result
-    ) {
-        if (!(destination
-                instanceof
-                ResolvedRouteEndpoint
-                        .Building building)) {
-            return null;
-        }
-
-        for (int i =
-             result.arcs().size() - 1;
-             i >= 0;
-             i--) {
-
-            RoutingArc arc =
-                    result.arcs().get(i);
-
-            if (building
-                    .entranceNodeIds()
-                    .contains(
-                            arc.fromNodeId()
-                    )) {
-
-                return arc.fromNodeId();
-            }
-        }
-
-        return null;
     }
 
     private RoutePoint toRoutePoint(

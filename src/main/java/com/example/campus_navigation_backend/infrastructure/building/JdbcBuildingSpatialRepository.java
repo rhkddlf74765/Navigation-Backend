@@ -36,7 +36,9 @@ public class JdbcBuildingSpatialRepository
                     id,
                     name
                 FROM public.buildings
-                WHERE LOWER(BTRIM(name)) =
+                WHERE name IS NOT NULL
+                  AND BTRIM(name) <> ''
+                  AND LOWER(BTRIM(name)) =
                       LOWER(BTRIM(:buildingName))
                 LIMIT 1
                 """;
@@ -83,6 +85,8 @@ public class JdbcBuildingSpatialRepository
                 FROM public.buildings b
                 CROSS JOIN user_point
                 WHERE b.geom IS NOT NULL
+                  AND b.name IS NOT NULL
+                  AND BTRIM(b.name) <> ''
                   AND ST_Covers(
                       b.geom,
                       user_point.geom
@@ -132,6 +136,8 @@ public class JdbcBuildingSpatialRepository
                 FROM public.buildings b
                 CROSS JOIN user_point
                 WHERE b.geom IS NOT NULL
+                  AND b.name IS NOT NULL
+                  AND BTRIM(b.name) <> ''
                 ORDER BY distance_meters ASC, b.id ASC
                 LIMIT 1
                 """;

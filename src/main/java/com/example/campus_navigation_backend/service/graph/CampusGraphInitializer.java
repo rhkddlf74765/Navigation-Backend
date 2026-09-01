@@ -101,20 +101,41 @@ public class CampusGraphInitializer {
             );
 
             if (row.graphNodeType()
-                    == GraphNodeType.ENTRANCE
-                    && row.buildingId() != null
-                    && row.buildingName() != null
-                    && !row
+                    != GraphNodeType.ENTRANCE) {
+                continue;
+            }
+
+            if (row.entranceId() == null) {
+                throw new IllegalStateException(
+                        "Entrance graph node has no source entrance. graphNodeId="
+                                + row.id()
+                );
+            }
+
+            if (row.buildingId() == null) {
+                continue;
+            }
+
+            if (row.buildingName() == null
+                    || row
                     .buildingName()
                     .isBlank()) {
-
-                builder
-                        .addBuildingEntrance(
-                                row.buildingId(),
-                                row.buildingName(),
-                                row.id()
-                        );
+                throw new IllegalStateException(
+                        "Entrance graph node references a building without a name. graphNodeId="
+                                + row.id()
+                                + ", entranceId="
+                                + row.entranceId()
+                                + ", buildingId="
+                                + row.buildingId()
+                );
             }
+
+            builder
+                    .addBuildingEntrance(
+                            row.buildingId(),
+                            row.buildingName(),
+                            row.id()
+                    );
         }
     }
 

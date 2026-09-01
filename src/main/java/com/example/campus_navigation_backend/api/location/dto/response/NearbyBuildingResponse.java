@@ -16,18 +16,26 @@ public record NearbyBuildingResponse(
     public static NearbyBuildingResponse from(
             NearbyBuilding building
     ) {
-
         return new NearbyBuildingResponse(
                 building.buildingId(),
                 building.name(),
-
-                // DB description 추가 전까지 null
-                null,
-
+                toDescription(
+                        building.description()
+                ),
                 building.lat(),
                 building.lon(),
                 building.ele(),
                 building.distanceMeters()
         );
+    }
+
+    private static BuildingDescription toDescription(
+            String description
+    ) {
+        return description == null
+                ? null
+                : new BuildingDescription(
+                        description
+                );
     }
 }

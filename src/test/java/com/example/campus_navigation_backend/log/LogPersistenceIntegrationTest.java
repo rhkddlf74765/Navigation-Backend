@@ -144,7 +144,7 @@ class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
                 SELECT destination_building_name,
-                       selected_entrance_id,
+                       selected_entrance_graph_node_id,
                        total_distance_meters,
                        total_cost,
                        approach_distance_meters,
@@ -159,7 +159,7 @@ class LogPersistenceIntegrationTest extends PostgisTestContainerSupport {
         );
 
         assertThat(row.get("destination_building_name")).isEqualTo("Test Building");
-        assertThat(row.get("selected_entrance_id")).isNotNull();
+        assertThat(row.get("selected_entrance_graph_node_id")).isNotNull();
         assertThat((Double) row.get("total_distance_meters")).isGreaterThan(0.0);
         assertThat((Double) row.get("total_cost")).isGreaterThan(0.0);
         assertThat((Double) row.get("approach_distance_meters")).isGreaterThanOrEqualTo(0.0);

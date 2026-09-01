@@ -1,3 +1,5 @@
+-- Historical/manual migration note.
+-- Production runtime must not execute this file automatically.
 -- final_nodes_3d graph-node IDs are not entrance IDs.
 -- Preserve the source entrance relationship explicitly on entrance graph nodes.
 

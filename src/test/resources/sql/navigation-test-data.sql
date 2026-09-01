@@ -47,7 +47,7 @@ INSERT INTO public.buildings (id, source_id, name, geom, description) VALUES
             ),
             5179
         ),
-        NULL
+        'Computer software laboratories and lecture rooms.'
     );
 
 INSERT INTO public.entrances (id, building_id, geom, node_type, description) VALUES
@@ -132,7 +132,7 @@ CREATE TABLE log.route_endpoint_log (
 CREATE TABLE log.route_result_log (
     route_session_id uuid PRIMARY KEY,
     destination_building_name text,
-    selected_entrance_id bigint,
+    selected_entrance_graph_node_id bigint,
     total_distance_meters double precision NOT NULL,
     total_cost double precision NOT NULL,
     approach_distance_meters double precision NOT NULL,

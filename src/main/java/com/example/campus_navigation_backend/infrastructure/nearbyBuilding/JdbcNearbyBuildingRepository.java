@@ -55,6 +55,8 @@ public class JdbcNearbyBuildingRepository
                     FROM public.buildings b
                     CROSS JOIN user_point
                     WHERE b.geom IS NOT NULL
+                      AND b.name IS NOT NULL
+                      AND BTRIM(b.name) <> ''
                       AND ST_DWithin(
                           b.geom,
                           user_point.geom,
