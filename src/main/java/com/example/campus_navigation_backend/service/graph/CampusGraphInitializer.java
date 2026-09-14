@@ -2,28 +2,26 @@ package com.example.campus_navigation_backend.service.graph;
 
 import com.example.campus_navigation_backend.domain.graph.CampusGraph;
 import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
-import com.example.campus_navigation_backend.domain.graph.GraphNode;
-import com.example.campus_navigation_backend.domain.graph.GraphNodeType;
-import com.example.campus_navigation_backend.domain.graph.PhysicalEdge;
-import com.example.campus_navigation_backend.domain.graph.cost.EdgeCostPolicy;
+import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationReport;
 import com.example.campus_navigation_backend.infrastructure.spatial.EdgeSpatialIndex;
 import com.example.campus_navigation_backend.repository.GraphDataRepository;
-import com.example.campus_navigation_backend.repository.dto.GraphEdgeRow;
-import com.example.campus_navigation_backend.repository.dto.GraphNodeRow;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import com.example.campus_navigation_backend.service.graph.validation.GraphValidationService;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
-public class CampusGraphInitializer {
+public class CampusGraphInitializer
+        implements ApplicationRunner {
 
     private final GraphDataRepository
             graphDataRepository;
 
-    private final EdgeCostPolicy
-            edgeCostPolicy;
+    private final CampusGraphLoader
+            campusGraphLoader;
+
+    private final GraphValidationService
+            graphValidationService;
 
     private final CampusGraphStore
             campusGraphStore;
@@ -33,15 +31,19 @@ public class CampusGraphInitializer {
 
     public CampusGraphInitializer(
             GraphDataRepository graphDataRepository,
-            EdgeCostPolicy edgeCostPolicy,
+            CampusGraphLoader campusGraphLoader,
+            GraphValidationService graphValidationService,
             CampusGraphStore campusGraphStore,
             EdgeSpatialIndex edgeSpatialIndex
     ) {
         this.graphDataRepository =
                 graphDataRepository;
 
-        this.edgeCostPolicy =
-                edgeCostPolicy;
+        this.campusGraphLoader =
+                campusGraphLoader;
+
+        this.graphValidationService =
+                graphValidationService;
 
         this.campusGraphStore =
                 campusGraphStore;
@@ -50,30 +52,50 @@ public class CampusGraphInitializer {
                 edgeSpatialIndex;
     }
 
-    @EventListener(
-            ApplicationReadyEvent.class
-    )
-    public void initialize() {
+    @Override
+    public void run(
+            ApplicationArguments args
+    ) {
 
         long graphVersionId =
                 graphDataRepository
                         .findActiveGraphVersionId();
 
-        CampusGraph.Builder builder =
-                CampusGraph.builder();
-
-        loadNodes(
-                builder,
-                graphVersionId
-        );
-
-        loadEdges(
-                builder,
-                graphVersionId
-        );
-
+        /*
+         * DB에서 ACTIVE graph를 읽어
+         * 아직 서비스에 등록하지 않은 임시 객체로 만든다.
+         */
         CampusGraph graph =
-                builder.build();
+                campusGraphLoader.load(
+                        graphVersionId
+                );
+
+        /*
+         * DB + Java graph 검증
+         */
+        GraphValidationReport report =
+                graphValidationService
+                        .validate(
+                                graphVersionId,
+                                graph
+                        );
+
+        /*
+         * ERROR가 하나라도 있으면
+         * 실제 CampusGraphStore에는 등록하지 않는다.
+         */
+        if (report.hasErrors()) {
+
+            throw new IllegalStateException(
+                    "Active graph validation failed. "
+                            + "graphVersionId="
+                            + graphVersionId
+                            + ", errors="
+                            + report.errorCount()
+                            + ", warnings="
+                            + report.warningCount()
+            );
+        }
 
         campusGraphStore.initialize(
                 graph
@@ -82,116 +104,5 @@ public class CampusGraphInitializer {
         edgeSpatialIndex.initialize(
                 graph.getPhysicalEdges()
         );
-    }
-
-    private void loadNodes(
-            CampusGraph.Builder builder,
-            long graphVersionId
-    ) {
-
-        List<GraphNodeRow> rows =
-                graphDataRepository
-                        .findAllGraphNodes(
-                                graphVersionId
-                        );
-
-        for (GraphNodeRow row : rows) {
-
-            builder.addNode(
-                    row.id(),
-                    row.graphNodeType(),
-                    row.point()
-            );
-
-            if (row.graphNodeType()
-                    != GraphNodeType.ENTRANCE) {
-                continue;
-            }
-
-            if (row.entranceId() == null) {
-                throw new IllegalStateException(
-                        "Entrance graph node has no source entrance. graphNodeId="
-                                + row.id()
-                );
-            }
-
-            /*
-             * Entrance 자체는 graph에 유지하되,
-             * operational Building과 연결되지 않았다면
-             * Building routing 후보로는 등록하지 않는다.
-             */
-            if (row.buildingId() == null) {
-                continue;
-            }
-
-            if (row.buildingName() == null
-                    || row.buildingName()
-                    .isBlank()) {
-
-                throw new IllegalStateException(
-                        "Entrance graph node references a building without a name. graphNodeId="
-                                + row.id()
-                                + ", entranceId="
-                                + row.entranceId()
-                                + ", buildingId="
-                                + row.buildingId()
-                );
-            }
-
-            builder.addBuildingEntrance(
-                    row.buildingId(),
-                    row.buildingName(),
-                    row.id()
-            );
-        }
-    }
-
-    private void loadEdges(
-            CampusGraph.Builder builder,
-            long graphVersionId
-    ) {
-
-        List<GraphEdgeRow> rows =
-                graphDataRepository
-                        .findAllGraphEdges(
-                                graphVersionId
-                        );
-
-        for (GraphEdgeRow row : rows) {
-
-            GraphNode source =
-                    builder.getNode(
-                            row.source()
-                    );
-
-            GraphNode target =
-                    builder.getNode(
-                            row.target()
-                    );
-
-            if (source == null
-                    || target == null) {
-
-                throw new IllegalStateException(
-                        "Edge endpoint node not found. edgeId="
-                                + row.id()
-                );
-            }
-
-            PhysicalEdge edge =
-                    PhysicalEdge.create(
-                            row.id(),
-                            row.source(),
-                            row.target(),
-                            row.distanceMeters(),
-                            row.highway(),
-                            row.geometry(),
-                            edgeCostPolicy
-                    );
-
-            builder.addPhysicalEdge(
-                    edge
-            );
-        }
     }
 }
