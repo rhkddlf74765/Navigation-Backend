@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Campus Navigation Routing Test</title>
+
+    <!-- Leaflet -->
+    <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <script
+            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    ></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family:
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        header {
+            padding: 16px 24px;
+            background: white;
+            border-bottom: 1px solid #ddd;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        header p {
+            margin: 6px 0 0;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 390px 1fr;
+            height: calc(100vh - 79px);
+        }
+
+        .sidebar {
+            overflow-y: auto;
+            padding: 16px;
+            background: white;
+            border-right: 1px solid #ddd;
+        }
+
+        .map-area {
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .section {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+
+        .section h2 {
+            font-size: 16px;
+            margin: 0 0 12px;
+        }
+
+        .field {
+            margin-bottom: 10px;
+        }
+
+        .field:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            height: 38px;
+            padding: 7px 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #555;
+        }
+
+        button {
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #f1f1f1;
+        }
+
+        .primary-button {
+            background: #222;
+            color: white;
+            border-color: #222;
+        }
+
+        .primary-button:hover {
+            background: #444;
+        }
+
+        .button-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .coordinate-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .json-box {
+            margin-top: 8px;
+            padding: 10px;
+            border-radius: 6px;
+            background: #111;
+            color: #eee;
+            font-family: Consolas, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 280px;
+            overflow: auto;
+        }
+
+        .status {
+            padding: 9px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #eee;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #216a29;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #a12622;
+        }
+
+        .status.loading {
+            background: #fff8e1;
+            color: #795d00;
+        }
+
+        .map-click-controller {
+            position: absolute;
+            z-index: 1000;
+            top: 12px;
+            right: 12px;
+            width: 220px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .map-click-controller label {
+            margin-bottom: 6px;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .summary-item {
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .summary-item strong {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 11px;
+            color: #777;
+        }
+
+        @media (max-width: 900px) {
+            .layout {
+                display: block;
+                height: auto;
+            }
+
+            .sidebar {
+                border-right: none;
+            }
+
+            .map-area {
+                height: 60vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Campus Navigation Routing Test</h1>
+
+    <p>
+        OSM 지도 기반 수동 라우팅 테스트 도구
+    </p>
+</header>
+
+<div class="layout">
+
+    <aside class="sidebar">
+
+        <!-- 상태 -->
+        <div
+                id="status"
+                class="status"
+        >
+            테스트 준비 완료
+        </div>
+
+
+        <!-- 사용자 -->
+        <div class="section">
+
+            <h2>User</h2>
+
+            <div class="field">
+                <label for="userId">
+                    User ID
+                </label>
+
+                <input
+                        id="userId"
+                        type="text"
+                >
+            </div>
+
+            <button
+                    type="button"
+                    onclick="generateNewUserId()"
+            >
+                새 UUID 생성
+            </button>
+
+        </div>
+
+
+        <!-- 출발지 -->
+        <div class="section">
+
+            <h2>출발지</h2>
+
+            <div class="field">
+
+                <label for="startType">
+                    입력 방식
+                </label>
+
+                <select
+                        id="startType"
+                        onchange="updateEndpointUi('start')"
+                >
+
+                    <option value="COORDINATE">
+                        좌표
+                    </option>
+
+                    <option value="BUILDING">
+                        건물 (Entrance 자동 선택)
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div id="startCoordinateFields">
+
+                <div class="coordinate-row">
+
+                    <div class="field">
+                        <label for="startLat">
+                            위도
+                        </label>
+
+                        <input
+                                id="startLat"
+                                type="number"
+                                step="any"
+                                placeholder="37.xxxxx"
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="startLon">
+                            경도
+                        </label>
+
+                        <input
+                                id="startLon"
+                                type="number"
+                                step="any"
+                                placeholder="127.xxxxx"
+                        >
+                    </div>
+
+                </div>
+
+                <div class="field">
+
+                    <label for="startEle">
+                        고도 (선택)
+                    </label>
+
+                    <input
+                            id="startEle"
+                            type="number"
+                            step="any"
+                            placeholder="0"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div
+                    id="startBuildingFields"
+                    class="hidden"
+            >
+
+                <div class="field">
+
+                    <label for="startBuilding">
+                        건물명
+                    </label>
+
+                    <input
+                            id="startBuilding"
+                            type="text"
+                            list="buildingList"
+                            placeholder="건물명 입력"
+                    >
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- 목적지 -->
+        <div class="section">
+
+            <h2>도착지</h2>
+
+            <div class="field">
+
+                <label for="destinationType">
+                    입력 방식
+                </label>
+
+                <select
+                        id="destinationType"
+                        onchange="updateEndpointUi('destination')"
+                >
+
+                    <option value="COORDINATE">
+                        좌표
+                    </option>
+
+                    <option value="BUILDING">
+                        건물 (Entrance 자동 선택)
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div id="destinationCoordinateFields">
+
+                <div class="coordinate-row">
+
+                    <div class="field">
+
+                        <label for="destinationLat">
+                            위도
+                        </label>
+
+                        <input
+                                id="destinationLat"
+                                type="number"
+                                step="any"
+                                placeholder="37.xxxxx"
+                        >
+
+                    </div>
+
+                    <div class="field">
+
+                        <label for="destinationLon">
+                            경도
+                        </label>
+
+                        <input
+                                id="destinationLon"
+                                type="number"
+                                step="any"
+                                placeholder="127.xxxxx"
+                        >
+
+                    </div>
+
+                </div>
+
+                <div class="field">
+
+                    <label for="destinationEle">
+                        고도 (선택)
+                    </label>
+
+                    <input
+                            id="destinationEle"
+                            type="number"
+                            step="any"
+                            placeholder="0"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div
+                    id="destinationBuildingFields"
+                    class="hidden"
+            >
+
+                <div class="field">
+
+                    <label for="destinationBuilding">
+                        건물명
+                    </label>
+
+                    <input
+                            id="destinationBuilding"
+                            type="text"
+                            list="buildingList"
+                            placeholder="건물명 입력"
+                    >
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- 건물 이름 목록 -->
+        <datalist id="buildingList"></datalist>
+
+
+        <!-- 실행 -->
+        <div class="section">
+
+            <div class="button-row">
+
+                <button
+                        class="primary-button"
+                        type="button"
+                        onclick="requestRoute()"
+                >
+                    라우팅 요청
+                </button>
+
+                <button
+                        type="button"
+                        onclick="resetTest()"
+                >
+                    새 테스트
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- Route Summary -->
+        <div
+                id="summarySection"
+                class="section hidden"
+        >
+
+            <h2>Route Summary</h2>
+
+            <div class="summary">
+
+                <div class="summary-item">
+                    <strong>거리</strong>
+                    <span id="summaryDistance">-</span>
+                </div>
+
+                <div class="summary-item">
+                    <strong>예상 시간</strong>
+                    <span id="summaryTime">-</span>
+                </div>
+
+                <div class="summary-item">
+                    <strong>경로 Point</strong>
+                    <span id="summaryPoints">-</span>
+                </div>
+
+                <div class="summary-item">
+                    <strong>Route Session</strong>
+                    <span id="summarySession">-</span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- 요청 JSON -->
+        <div class="section">
+
+            <h2>Request JSON</h2>
+
+            <div
+                    id="requestJson"
+                    class="json-box"
+            >
+                아직 요청하지 않았습니다.
+            </div>
+
+        </div>
+
+
+        <!-- 응답 JSON -->
+        <div class="section">
+
+            <h2>Response JSON</h2>
+
+            <div
+                    id="responseJson"
+                    class="json-box"
+            >
+                아직 응답이 없습니다.
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <main class="map-area">
+
+        <div id="map"></div>
+
+        <div class="map-click-controller">
+
+            <label for="mapClickTarget">
+                지도 클릭 시 입력할 위치
+            </label>
+
+            <select id="mapClickTarget">
+
+                <option value="start">
+                    출발지
+                </option>
+
+                <option value="destination">
+                    도착지
+                </option>
+
+            </select>
+
+        </div>
+
+    </main>
+
+</div>
+
+
+<script>
+
+    /*
+     * =========================================================
+     * API
+     * =========================================================
+     *
+     * 이 HTML 파일을 Spring Boot static resource로 사용하므로
+     * 같은 origin의 API를 그대로 호출한다.
+     */
+
+    const ROUTE_API = "/api/routes";
+    const BUILDING_API = "/api/buildings";
+
+
+    /*
+     * =========================================================
+     * Map
+     * =========================================================
+     */
+
+    const map = L.map(
+        "map"
+    ).setView(
+        [
+            37.557,
+            127.045
+        ],
+        16
+    );
+
+
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 20,
+
+            attribution:
+                "&copy; OpenStreetMap contributors"
+        }
+    ).addTo(map);
+
+
+    let routeLayer = null;
+
+    let startMarker = null;
+
+    let destinationMarker = null;
+
+
+    /*
+     * =========================================================
+     * Initialization
+     * =========================================================
+     */
+
+    window.addEventListener(
+        "DOMContentLoaded",
+        async () => {
+
+            generateNewUserId();
+
+            updateEndpointUi(
+                "start"
+            );
+
+            updateEndpointUi(
+                "destination"
+            );
+
+            await loadBuildings();
+        }
+    );
+
+
+    /*
+     * =========================================================
+     * Building API
+     * =========================================================
+     */
+
+    async function loadBuildings() {
+
+        try {
+
+            const response =
+                await fetch(
+                    BUILDING_API,
+                    {
+                        method: "GET",
+                        credentials: "same-origin"
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "건물 목록 조회 실패: HTTP "
+                    + response.status
+                );
+            }
+
+
+            const data =
+                await response.json();
+
+
+            const datalist =
+                document.getElementById(
+                    "buildingList"
+                );
+
+
+            datalist.innerHTML = "";
+
+
+            for (
+                const building
+                of data.buildings ?? []
+                ) {
+
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+                option.value =
+                    building;
+
+                datalist.appendChild(
+                    option
+                );
+            }
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+
+            setStatus(
+                "건물 목록을 불러오지 못했습니다. 직접 입력은 가능합니다.",
+                "error"
+            );
+        }
+    }
+
+
+    /*
+     * =========================================================
+     * Endpoint UI
+     * =========================================================
+     */
+
+    function updateEndpointUi(
+        endpoint
+    ) {
+
+        const type =
+            document.getElementById(
+                endpoint + "Type"
+            ).value;
+
+
+        const coordinateFields =
+            document.getElementById(
+                endpoint
+                + "CoordinateFields"
+            );
+
+
+        const buildingFields =
+            document.getElementById(
+                endpoint
+                + "BuildingFields"
+            );
+
+
+        if (type === "COORDINATE") {
+
+            coordinateFields
+                .classList
+                .remove(
+                    "hidden"
+                );
+
+            buildingFields
+                .classList
+                .add(
+                    "hidden"
+                );
+
+        } else {
+
+            coordinateFields
+                .classList
+                .add(
+                    "hidden"
+                );
+
+            buildingFields
+                .classList
+                .remove(
+                    "hidden"
+                );
+        }
+    }
+
+
+    /*
+     * =========================================================
+     * Map Click
+     * =========================================================
+     */
+
+    map.on(
+        "click",
+        event => {
+
+            const target =
+                document.getElementById(
+                    "mapClickTarget"
+                ).value;
+
+
+            /*
+             * 지도에서 좌표를 선택하면
+             * endpoint type을 자동으로 COORDINATE로 전환한다.
+             */
+
+            document.getElementById(
+                target + "Type"
+            ).value =
+                "COORDINATE";
+
+
+            updateEndpointUi(
+                target
+            );
+
+
+            document.getElementById(
+                target + "Lat"
+            ).value =
+                event.latlng.lat
+                    .toFixed(7);
+
+
+            document.getElementById(
+                target + "Lon"
+            ).value =
+                event.latlng.lng
+                    .toFixed(7);
+
+
+            updateEndpointMarker(
+                target,
+                event.latlng.lat,
+                event.latlng.lng
+            );
+        }
+    );
+
+
+    /*
+     * =========================================================
+     * Route Request
+     * =========================================================
+     */
+
+    async function requestRoute() {
+
+        clearRouteOnly();
+
+
+        let request;
+
+        try {
+
+            request =
+                buildRouteRequest();
+
+        } catch (error) {
+
+            setStatus(
+                error.message,
+                "error"
+            );
+
+            return;
+        }
+
+
+        /*
+         * 실제 서버에 전달되는 객체를 그대로 표시한다.
+         */
+
+        document.getElementById(
+            "requestJson"
+        ).textContent =
+            JSON.stringify(
+                request,
+                null,
+                2
+            );
+
+
+        document.getElementById(
+            "responseJson"
+        ).textContent =
+            "응답 대기 중...";
+
+
+        setStatus(
+            "라우팅 요청 중...",
+            "loading"
+        );
+
+
+        try {
+
+            const response =
+                await fetch(
+                    ROUTE_API,
+                    {
+                        method: "POST",
+
+                        credentials:
+                            "same-origin",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify(
+                                request
+                            )
+                    }
+                );
+
+
+            const rawText =
+                await response.text();
+
+
+            let body;
+
+
+            try {
+
+                body =
+                    rawText
+                        ? JSON.parse(
+                            rawText
+                        )
+                        : null;
+
+            } catch {
+
+                body = rawText;
+            }
+
+
+            document.getElementById(
+                "responseJson"
+            ).textContent =
+                typeof body === "string"
+                    ? body
+                    : JSON.stringify(
+                        body,
+                        null,
+                        2
+                    );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "라우팅 실패: HTTP "
+                    + response.status
+                );
+            }
+
+
+            if (!body) {
+
+                throw new Error(
+                    "응답 Body가 없습니다."
+                );
+            }
+
+
+            drawRoute(
+                body
+            );
+
+
+            renderSummary(
+                body
+            );
+
+
+            setStatus(
+                "라우팅 요청-응답 완료",
+                "success"
+            );
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+
+
+            setStatus(
+                error.message,
+                "error"
+            );
+        }
+    }
+
+
+    /*
+     * =========================================================
+     * Request creation
+     * =========================================================
+     */
+
+    function buildRouteRequest() {
+
+        const userId =
+            document
+                .getElementById(
+                    "userId"
+                )
+                .value
+                .trim();
+
+
+        if (!userId) {
+
+            throw new Error(
+                "User ID를 입력해야 합니다."
+            );
+        }
+
+
+        return {
+
+            userId: userId,
+
+            start:
+                buildEndpoint(
+                    "start"
+                ),
+
+            destination:
+                buildEndpoint(
+                    "destination"
+                )
+        };
+    }
+
+
+    function buildEndpoint(
+        endpoint
+    ) {
+
+        const type =
+            document
+                .getElementById(
+                    endpoint + "Type"
+                )
+                .value;
+
+
+        if (type === "BUILDING") {
+
+            const buildingName =
+                document
+                    .getElementById(
+                        endpoint
+                        + "Building"
+                    )
+                    .value
+                    .trim();
+
+
+            if (!buildingName) {
+
+                throw new Error(
+                    endpointName(endpoint)
+                    + " 건물명을 입력해야 합니다."
+                );
+            }
+
+
+            return {
+                type: "BUILDING",
+                lon: null,
+                lat: null,
+                ele: null,
+                buildingName:
+                buildingName
+            };
+        }
+
+
+        const lat =
+            parseRequiredNumber(
+                endpoint + "Lat",
+                endpointName(endpoint)
+                + " 위도"
+            );
+
+
+        const lon =
+            parseRequiredNumber(
+                endpoint + "Lon",
+                endpointName(endpoint)
+                + " 경도"
+            );
+
+
+        const eleInput =
+            document
+                .getElementById(
+                    endpoint + "Ele"
+                )
+                .value
+                .trim();
+
+
+        const ele =
+            eleInput === ""
+                ? null
+                : Number(
+                    eleInput
+                );
+
+
+        if (
+            ele !== null
+            && !Number.isFinite(ele)
+        ) {
+
+            throw new Error(
+                endpointName(endpoint)
+                + " 고도가 올바르지 않습니다."
+            );
+        }
+
+
+        /*
+         * 입력 좌표를 지도에도 표시한다.
+         */
+
+        updateEndpointMarker(
+            endpoint,
+            lat,
+            lon
+        );
+
+
+        return {
+            type: "COORDINATE",
+            lon: lon,
+            lat: lat,
+            ele: ele,
+            buildingName: null
+        };
+    }
+
+
+    /*
+     * =========================================================
+     * Route Rendering
+     * =========================================================
+     */
+
+    function drawRoute(
+        response
+    ) {
+
+        if (
+            !Array.isArray(
+                response.path
+            )
+        ) {
+
+            throw new Error(
+                "응답에 path 배열이 없습니다."
+            );
+        }
+
+
+        if (
+            response.path.length === 0
+        ) {
+
+            return;
+        }
+
+
+        const latLngs =
+            response.path.map(
+                point => {
+
+                    if (
+                        !Number.isFinite(
+                            point.lat
+                        )
+                        ||
+                        !Number.isFinite(
+                            point.lon
+                        )
+                    ) {
+
+                        throw new Error(
+                            "경로에 잘못된 좌표가 포함되어 있습니다."
+                        );
+                    }
+
+
+                    return [
+                        point.lat,
+                        point.lon
+                    ];
+                }
+            );
+
+
+        routeLayer =
+            L.polyline(
+                latLngs,
+                {
+                    weight: 6,
+                    opacity: 0.85
+                }
+            ).addTo(
+                map
+            );
+
+
+        /*
+         * Building endpoint는 요청 시 정확한 Entrance 좌표를
+         * 알 수 없으므로 응답 path의 첫 점/마지막 점이
+         * 실제 라우팅 시작/종료 위치를 보여준다.
+         */
+
+        const first =
+            response.path[0];
+
+
+        const last =
+            response.path[
+            response.path.length - 1
+                ];
+
+
+        if (
+            document.getElementById(
+                "startType"
+            ).value === "BUILDING"
+        ) {
+
+            updateEndpointMarker(
+                "start",
+                first.lat,
+                first.lon,
+                "라우팅 시작 Entrance"
+            );
+        }
+
+
+        if (
+            document.getElementById(
+                "destinationType"
+            ).value === "BUILDING"
+        ) {
+
+            updateEndpointMarker(
+                "destination",
+                last.lat,
+                last.lon,
+                "라우팅 도착 Entrance"
+            );
+        }
+
+
+        const bounds =
+            routeLayer.getBounds();
+
+
+        if (
+            bounds.isValid()
+        ) {
+
+            map.fitBounds(
+                bounds,
+                {
+                    padding: [
+                        40,
+                        40
+                    ]
+                }
+            );
+        }
+    }
+
+
+    /*
+     * =========================================================
+     * Marker
+     * =========================================================
+     */
+
+    function updateEndpointMarker(
+        endpoint,
+        lat,
+        lon,
+        label
+    ) {
+
+        const markerLabel =
+            label
+            ??
+            (
+                endpoint === "start"
+                    ? "출발지"
+                    : "도착지"
+            );
+
+
+        if (
+            endpoint === "start"
+        ) {
+
+            if (
+                startMarker
+            ) {
+
+                map.removeLayer(
+                    startMarker
+                );
+            }
+
+
+            startMarker =
+                L.marker(
+                    [
+                        lat,
+                        lon
+                    ]
+                )
+                    .addTo(
+                        map
+                    )
+                    .bindPopup(
+                        markerLabel
+                    );
+
+        } else {
+
+            if (
+                destinationMarker
+            ) {
+
+                map.removeLayer(
+                    destinationMarker
+                );
+            }
+
+
+            destinationMarker =
+                L.marker(
+                    [
+                        lat,
+                        lon
+                    ]
+                )
+                    .addTo(
+                        map
+                    )
+                    .bindPopup(
+                        markerLabel
+                    );
+        }
+    }
+
+
+    /*
+     * =========================================================
+     * Summary
+     * =========================================================
+     */
+
+    function renderSummary(
+        response
+    ) {
+
+        const section =
+            document.getElementById(
+                "summarySection"
+            );
+
+
+        section.classList.remove(
+            "hidden"
+        );
+
+
+        document.getElementById(
+            "summaryDistance"
+        ).textContent =
+            Number.isFinite(
+                response.totalDistanceMeters
+            )
+                ? response
+                    .totalDistanceMeters
+                    .toFixed(2)
+                + " m"
+                : "-";
+
+
+        /*
+         * 현재 RouteExpectedTime JSON은
+         *
+         * {
+         *   "time": seconds
+         * }
+         *
+         * 형태이다.
+         */
+
+        const seconds =
+            response.expectedTime
+                ?.time;
+
+
+        document.getElementById(
+            "summaryTime"
+        ).textContent =
+            Number.isFinite(
+                seconds
+            )
+                ? formatSeconds(
+                    seconds
+                )
+                : "-";
+
+
+        document.getElementById(
+            "summaryPoints"
+        ).textContent =
+            Array.isArray(
+                response.path
+            )
+                ? response.path.length
+                : "-";
+
+
+        const sessionId =
+            response.routeSessionId
+            ?? "-";
+
+
+        document.getElementById(
+            "summarySession"
+        ).textContent =
+            sessionId === "-"
+                ? "-"
+                : sessionId.substring(
+                0,
+                8
+            ) + "...";
+    }
+
+
+    /*
+     * =========================================================
+     * Reset
+     * =========================================================
+     */
+
+    function resetTest() {
+
+        clearRouteOnly();
+
+
+        removeEndpointMarker(
+            "start"
+        );
+
+
+        removeEndpointMarker(
+            "destination"
+        );
+
+
+        document.getElementById(
+            "startType"
+        ).value =
+            "COORDINATE";
+
+
+        document.getElementById(
+            "destinationType"
+        ).value =
+            "COORDINATE";
+
+
+        clearInput(
+            "startLat"
+        );
+
+        clearInput(
+            "startLon"
+        );
+
+        clearInput(
+            "startEle"
+        );
+
+        clearInput(
+            "startBuilding"
+        );
+
+        clearInput(
+            "destinationLat"
+        );
+
+        clearInput(
+            "destinationLon"
+        );
+
+        clearInput(
+            "destinationEle"
+        );
+
+        clearInput(
+            "destinationBuilding"
+        );
+
+
+        updateEndpointUi(
+            "start"
+        );
+
+
+        updateEndpointUi(
+            "destination"
+        );
+
+
+        document.getElementById(
+            "requestJson"
+        ).textContent =
+            "아직 요청하지 않았습니다.";
+
+
+        document.getElementById(
+            "responseJson"
+        ).textContent =
+            "아직 응답이 없습니다.";
+
+
+        document
+            .getElementById(
+                "summarySection"
+            )
+            .classList
+            .add(
+                "hidden"
+            );
+
+
+        setStatus(
+            "새 테스트 준비 완료",
+            ""
+        );
+    }
+
+
+    function clearRouteOnly() {
+
+        if (
+            routeLayer
+        ) {
+
+            map.removeLayer(
+                routeLayer
+            );
+
+            routeLayer = null;
+        }
+    }
+
+
+    function removeEndpointMarker(
+        endpoint
+    ) {
+
+        if (
+            endpoint === "start"
+        ) {
+
+            if (
+                startMarker
+            ) {
+
+                map.removeLayer(
+                    startMarker
+                );
+
+                startMarker = null;
+            }
+
+            return;
+        }
+
+
+        if (
+            destinationMarker
+        ) {
+
+            map.removeLayer(
+                destinationMarker
+            );
+
+            destinationMarker = null;
+        }
+    }
+
+
+    /*
+     * =========================================================
+     * Utility
+     * =========================================================
+     */
+
+    function generateNewUserId() {
+
+        document.getElementById(
+            "userId"
+        ).value =
+            crypto.randomUUID();
+    }
+
+
+    function parseRequiredNumber(
+        elementId,
+        displayName
+    ) {
+
+        const raw =
+            document
+                .getElementById(
+                    elementId
+                )
+                .value
+                .trim();
+
+
+        if (!raw) {
+
+            throw new Error(
+                displayName
+                + "를 입력해야 합니다."
+            );
+        }
+
+
+        const value =
+            Number(
+                raw
+            );
+
+
+        if (
+            !Number.isFinite(
+                value
+            )
+        ) {
+
+            throw new Error(
+                displayName
+                + "가 올바르지 않습니다."
+            );
+        }
+
+
+        return value;
+    }
+
+
+    function endpointName(
+        endpoint
+    ) {
+
+        return endpoint === "start"
+            ? "출발지"
+            : "도착지";
+    }
+
+
+    function clearInput(
+        id
+    ) {
+
+        document.getElementById(
+            id
+        ).value =
+            "";
+    }
+
+
+    function setStatus(
+        message,
+        type
+    ) {
+
+        const status =
+            document.getElementById(
+                "status"
+            );
+
+
+        status.textContent =
+            message;
+
+
+        status.className =
+            "status";
+
+
+        if (
+            type
+        ) {
+
+            status.classList.add(
+                type
+            );
+        }
+    }
+
+
+    function formatSeconds(
+        seconds
+    ) {
+
+        const rounded =
+            Math.round(
+                seconds
+            );
+
+
+        if (
+            rounded < 60
+        ) {
+
+            return rounded
+                + "초";
+        }
+
+
+        const minutes =
+            Math.floor(
+                rounded / 60
+            );
+
+
+        const remaining =
+            rounded % 60;
+
+
+        return minutes
+            + "분 "
+            + remaining
+            + "초";
+    }
+
+</script>
+
+</body>
+</html>

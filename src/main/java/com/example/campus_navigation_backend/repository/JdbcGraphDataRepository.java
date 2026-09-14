@@ -1,6 +1,5 @@
 package com.example.campus_navigation_backend.repository;
 
-import com.example.campus_navigation_backend.config.NavigationProperties;
 import com.example.campus_navigation_backend.repository.dto.GraphEdgeRow;
 import com.example.campus_navigation_backend.repository.dto.GraphNodeRow;
 import com.example.campus_navigation_backend.support.GeoJsonGeometryParser;
@@ -16,71 +15,97 @@ public class JdbcGraphDataRepository
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    private final NavigationProperties properties;
-
     private final GeoJsonGeometryParser
             geoJsonGeometryParser;
 
     public JdbcGraphDataRepository(
             NamedParameterJdbcTemplate jdbc,
-            NavigationProperties properties,
-            GeoJsonGeometryParser
-                    geoJsonGeometryParser
+            GeoJsonGeometryParser geoJsonGeometryParser
     ) {
         this.jdbc = jdbc;
-        this.properties = properties;
         this.geoJsonGeometryParser =
                 geoJsonGeometryParser;
     }
 
     @Override
-    public List<GraphNodeRow>
-    findAllGraphNodes() {
+    public long findActiveGraphVersionId() {
+
+        String sql = """
+                SELECT id
+                FROM routing.graph_versions
+                WHERE status = 'ACTIVE'
+                ORDER BY id
+                """;
+
+        List<Long> activeVersionIds =
+                jdbc.query(
+                        sql,
+                        new MapSqlParameterSource(),
+                        (rs, rowNum) ->
+                                rs.getLong("id")
+                );
+
+        if (activeVersionIds.isEmpty()) {
+            throw new IllegalStateException(
+                    "Active graph version does not exist."
+            );
+        }
+
+        if (activeVersionIds.size() > 1) {
+            throw new IllegalStateException(
+                    "Multiple active graph versions exist."
+            );
+        }
+
+        return activeVersionIds.get(0);
+    }
+
+    @Override
+    public List<GraphNodeRow> findAllGraphNodes(
+            long graphVersionId
+    ) {
 
         String sql = """
                 SELECT
                     n.id,
                     n.node_type,
-                    n.description,
+
+                    NULL::text AS description,
+
                     n.entrance_id,
+
                     b.id AS building_id,
                     b.name AS building_name,
-                    ST_X(
-                        ST_Transform(
-                            n.geom,
-                            :metricSrid
-                        )
-                    ) AS x,
-                    ST_Y(
-                        ST_Transform(
-                            n.geom,
-                            :metricSrid
-                        )
-                    ) AS y,
+
+                    ST_X(n.geom) AS x,
+                    ST_Y(n.geom) AS y,
+
                     COALESCE(
-                        ST_Z(
-                            ST_Transform(
-                                n.geom,
-                                :metricSrid
-                            )
-                        ),
+                        ST_Z(n.geom),
                         0
                     ) AS z
-                FROM public.final_nodes_3d n
-                LEFT JOIN public.entrances e
+
+                FROM routing.graph_nodes n
+
+                LEFT JOIN spatial.entrances e
                   ON e.id = n.entrance_id
-                LEFT JOIN public.buildings b
+                 AND e.is_operational = TRUE
+
+                LEFT JOIN spatial.buildings b
                   ON b.id = e.building_id
-                WHERE n.geom IS NOT NULL
+                 AND b.is_operational = TRUE
+
+                WHERE n.graph_version_id =
+                      :graphVersionId
+
                 ORDER BY n.id
                 """;
 
         MapSqlParameterSource params =
                 new MapSqlParameterSource()
                         .addValue(
-                                "metricSrid",
-                                properties
-                                        .metricSrid()
+                                "graphVersionId",
+                                graphVersionId
                         );
 
         return jdbc.query(
@@ -114,36 +139,40 @@ public class JdbcGraphDataRepository
     }
 
     @Override
-    public List<GraphEdgeRow>
-    findAllGraphEdges() {
+    public List<GraphEdgeRow> findAllGraphEdges(
+            long graphVersionId
+    ) {
 
         String sql = """
                 SELECT
                     id,
-                    highway,
-                    source,
-                    target,
-                    dist,
+
+                    movement_type AS highway,
+
+                    source_node_id AS source,
+                    target_node_id AS target,
+
+                    distance_m AS dist,
+
                     ST_AsGeoJSON(
-                        ST_Transform(
-                            geom,
-                            :metricSrid
-                        )
+                        geom
                     ) AS geom_json
-                FROM public.final_edges_split_3d
-                WHERE geom IS NOT NULL
-                  AND source IS NOT NULL
-                  AND target IS NOT NULL
-                  AND dist IS NOT NULL
+
+                FROM routing.graph_edges
+
+                WHERE graph_version_id =
+                      :graphVersionId
+
+                  AND is_enabled = TRUE
+
                 ORDER BY id
                 """;
 
         MapSqlParameterSource params =
                 new MapSqlParameterSource()
                         .addValue(
-                                "metricSrid",
-                                properties
-                                        .metricSrid()
+                                "graphVersionId",
+                                graphVersionId
                         );
 
         return jdbc.query(

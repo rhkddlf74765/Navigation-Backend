@@ -32,16 +32,17 @@ public class JdbcBuildingSpatialRepository
             String buildingName
     ) {
         String sql = """
-                SELECT
-                    id,
-                    name
-                FROM public.buildings
-                WHERE name IS NOT NULL
-                  AND BTRIM(name) <> ''
-                  AND LOWER(BTRIM(name)) =
-                      LOWER(BTRIM(:buildingName))
-                LIMIT 1
-                """;
+        SELECT
+            id,
+            name
+        FROM spatial.buildings
+        WHERE is_operational = TRUE
+          AND name IS NOT NULL
+          AND BTRIM(name) <> ''
+          AND LOWER(BTRIM(name)) =
+              LOWER(BTRIM(:buildingName))
+        LIMIT 1
+        """;
 
         return jdbc.query(
                         sql,
@@ -66,34 +67,47 @@ public class JdbcBuildingSpatialRepository
             double lon
     ) {
         String sql = """
-                WITH user_point AS (
-                    SELECT ST_Transform(
-                        ST_SetSRID(
-                            ST_MakePoint(:lon, :lat),
-                            :requestSrid
-                        ),
-                        :buildingSrid
-                    ) AS geom
-                )
-                SELECT
-                    b.id,
-                    b.name,
-                    ST_Distance(
-                        ST_Boundary(b.geom),
-                        user_point.geom
-                    ) AS boundary_distance
-                FROM public.buildings b
-                CROSS JOIN user_point
-                WHERE b.geom IS NOT NULL
-                  AND b.name IS NOT NULL
-                  AND BTRIM(b.name) <> ''
-                  AND ST_Covers(
-                      b.geom,
-                      user_point.geom
-                  )
-                ORDER BY boundary_distance DESC, b.id ASC
-                LIMIT 1
-                """;
+        WITH user_point AS (
+            SELECT ST_Transform(
+                ST_SetSRID(
+                    ST_MakePoint(
+                        :lon,
+                        :lat
+                    ),
+                    :requestSrid
+                ),
+                :metricSrid
+            ) AS geom
+        )
+
+        SELECT
+            b.id,
+            b.name,
+
+            ST_Distance(
+                ST_Boundary(b.geom),
+                user_point.geom
+            ) AS boundary_distance
+
+        FROM spatial.buildings b
+        CROSS JOIN user_point
+
+        WHERE b.is_operational = TRUE
+          AND b.geom IS NOT NULL
+          AND b.name IS NOT NULL
+          AND BTRIM(b.name) <> ''
+
+          AND ST_Covers(
+              b.geom,
+              user_point.geom
+          )
+
+        ORDER BY
+            boundary_distance DESC,
+            b.id ASC
+
+        LIMIT 1
+        """;
 
         return jdbc.query(
                         sql,
@@ -120,27 +134,39 @@ public class JdbcBuildingSpatialRepository
             double lon
     ) {
         String sql = """
-                WITH user_point AS (
-                    SELECT ST_Transform(
-                        ST_SetSRID(
-                            ST_MakePoint(:lon, :lat),
-                            :requestSrid
-                        ),
-                        :buildingSrid
-                    ) AS geom
-                )
-                SELECT ST_Distance(
-                    b.geom,
-                    user_point.geom
-                ) AS distance_meters
-                FROM public.buildings b
-                CROSS JOIN user_point
-                WHERE b.geom IS NOT NULL
-                  AND b.name IS NOT NULL
-                  AND BTRIM(b.name) <> ''
-                ORDER BY distance_meters ASC, b.id ASC
-                LIMIT 1
-                """;
+        WITH user_point AS (
+            SELECT ST_Transform(
+                ST_SetSRID(
+                    ST_MakePoint(
+                        :lon,
+                        :lat
+                    ),
+                    :requestSrid
+                ),
+                :metricSrid
+            ) AS geom
+        )
+
+        SELECT
+            ST_Distance(
+                b.geom,
+                user_point.geom
+            ) AS distance_meters
+
+        FROM spatial.buildings b
+        CROSS JOIN user_point
+
+        WHERE b.is_operational = TRUE
+          AND b.geom IS NOT NULL
+          AND b.name IS NOT NULL
+          AND BTRIM(b.name) <> ''
+
+        ORDER BY
+            distance_meters ASC,
+            b.id ASC
+
+        LIMIT 1
+        """;
 
         return jdbc.query(
                         sql,
@@ -179,8 +205,8 @@ public class JdbcBuildingSpatialRepository
                         properties.requestSrid()
                 )
                 .addValue(
-                        "buildingSrid",
-                        properties.buildingSrid()
+                        "metricSrid",
+                        properties.metricSrid()
                 );
     }
 }

@@ -93,20 +93,18 @@ class CampusGraphInitializerTest {
             CampusGraphStore store,
             List<GraphNodeRow> nodes
     ) {
+
         NavigationProperties properties =
                 new NavigationProperties(
                         4326,
                         5186,
-                        5179,
                         30.0,
                         20,
-                        25.0,
-                        List.of("footway")
+                        25.0
                 );
 
         return new CampusGraphInitializer(
                 new FakeGraphDataRepository(nodes),
-                properties,
                 (highway, distanceMeters, elevationDelta) ->
                         distanceMeters,
                 store,
@@ -119,12 +117,21 @@ class CampusGraphInitializerTest {
     ) implements GraphDataRepository {
 
         @Override
-        public List<GraphNodeRow> findAllGraphNodes() {
+        public long findActiveGraphVersionId() {
+            return 1L;
+        }
+
+        @Override
+        public List<GraphNodeRow> findAllGraphNodes(
+                long graphVersionId
+        ) {
             return nodes;
         }
 
         @Override
-        public List<GraphEdgeRow> findAllGraphEdges() {
+        public List<GraphEdgeRow> findAllGraphEdges(
+                long graphVersionId
+        ) {
             return List.of();
         }
     }

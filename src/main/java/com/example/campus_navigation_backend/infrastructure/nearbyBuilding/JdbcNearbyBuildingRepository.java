@@ -33,58 +33,82 @@ public class JdbcNearbyBuildingRepository
             int limit
     ) {
         String sql = """
-                WITH user_point AS (
-                    SELECT ST_Transform(
-                        ST_SetSRID(
-                            ST_MakePoint(:lon, :lat),
-                            :requestSrid
-                        ),
-                        :buildingSrid
-                    ) AS geom
+        WITH user_point AS (
+            SELECT ST_Transform(
+                ST_SetSRID(
+                    ST_MakePoint(
+                        :lon,
+                        :lat
+                    ),
+                    :requestSrid
                 ),
-                nearby AS (
-                    SELECT
-                        b.id,
-                        b.name,
-                        b.description,
-                        ST_PointOnSurface(b.geom) AS marker_geom,
-                        ST_Distance(
-                            b.geom,
-                            user_point.geom
-                        ) AS distance_meters
-                    FROM public.buildings b
-                    CROSS JOIN user_point
-                    WHERE b.geom IS NOT NULL
-                      AND b.name IS NOT NULL
-                      AND BTRIM(b.name) <> ''
-                      AND ST_DWithin(
-                          b.geom,
-                          user_point.geom,
-                          :radiusMeters
-                      )
-                    ORDER BY distance_meters ASC, b.id ASC
-                    LIMIT :limit
+                :metricSrid
+            ) AS geom
+        ),
+
+        nearby AS (
+            SELECT
+                b.id,
+                b.name,
+                b.description,
+
+                ST_PointOnSurface(
+                    b.geom
+                ) AS marker_geom,
+
+                ST_Distance(
+                    b.geom,
+                    user_point.geom
+                ) AS distance_meters
+
+            FROM spatial.buildings b
+            CROSS JOIN user_point
+
+            WHERE b.is_operational = TRUE
+              AND b.geom IS NOT NULL
+              AND b.name IS NOT NULL
+              AND BTRIM(b.name) <> ''
+
+              AND ST_DWithin(
+                  b.geom,
+                  user_point.geom,
+                  :radiusMeters
+              )
+
+            ORDER BY
+                distance_meters ASC,
+                b.id ASC
+
+            LIMIT :limit
+        )
+
+        SELECT
+            id,
+            name,
+            description,
+
+            ST_Y(
+                ST_Transform(
+                    marker_geom,
+                    :requestSrid
                 )
-                SELECT
-                    id,
-                    name,
-                    description,
-                    ST_Y(
-                        ST_Transform(
-                            marker_geom,
-                            :requestSrid
-                        )
-                    ) AS lat,
-                    ST_X(
-                        ST_Transform(
-                            marker_geom,
-                            :requestSrid
-                        )
-                    ) AS lon,
-                    distance_meters
-                FROM nearby
-                ORDER BY distance_meters ASC, id ASC
-                """;
+            ) AS lat,
+
+            ST_X(
+                ST_Transform(
+                    marker_geom,
+                    :requestSrid
+                )
+            ) AS lon,
+
+            distance_meters
+
+        FROM nearby
+
+        ORDER BY
+            distance_meters ASC,
+            id ASC
+        """;
 
         MapSqlParameterSource params =
                 new MapSqlParameterSource()
@@ -101,8 +125,8 @@ public class JdbcNearbyBuildingRepository
                                 properties.requestSrid()
                         )
                         .addValue(
-                                "buildingSrid",
-                                properties.buildingSrid()
+                                "metricSrid",
+                                properties.metricSrid()
                         )
                         .addValue(
                                 "radiusMeters",

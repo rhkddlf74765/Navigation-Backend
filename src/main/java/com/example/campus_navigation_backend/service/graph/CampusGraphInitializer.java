@@ -1,6 +1,5 @@
 package com.example.campus_navigation_backend.service.graph;
 
-import com.example.campus_navigation_backend.config.NavigationProperties;
 import com.example.campus_navigation_backend.domain.graph.CampusGraph;
 import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
 import com.example.campus_navigation_backend.domain.graph.GraphNode;
@@ -16,18 +15,12 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class CampusGraphInitializer {
 
     private final GraphDataRepository
             graphDataRepository;
-
-    private final NavigationProperties
-            properties;
 
     private final EdgeCostPolicy
             edgeCostPolicy;
@@ -39,18 +32,13 @@ public class CampusGraphInitializer {
             edgeSpatialIndex;
 
     public CampusGraphInitializer(
-            GraphDataRepository
-                    graphDataRepository,
-            NavigationProperties properties,
+            GraphDataRepository graphDataRepository,
             EdgeCostPolicy edgeCostPolicy,
             CampusGraphStore campusGraphStore,
             EdgeSpatialIndex edgeSpatialIndex
     ) {
         this.graphDataRepository =
                 graphDataRepository;
-
-        this.properties =
-                properties;
 
         this.edgeCostPolicy =
                 edgeCostPolicy;
@@ -67,11 +55,22 @@ public class CampusGraphInitializer {
     )
     public void initialize() {
 
+        long graphVersionId =
+                graphDataRepository
+                        .findActiveGraphVersionId();
+
         CampusGraph.Builder builder =
                 CampusGraph.builder();
 
-        loadNodes(builder);
-        loadEdges(builder);
+        loadNodes(
+                builder,
+                graphVersionId
+        );
+
+        loadEdges(
+                builder,
+                graphVersionId
+        );
 
         CampusGraph graph =
                 builder.build();
@@ -86,11 +85,15 @@ public class CampusGraphInitializer {
     }
 
     private void loadNodes(
-            CampusGraph.Builder builder
+            CampusGraph.Builder builder,
+            long graphVersionId
     ) {
+
         List<GraphNodeRow> rows =
                 graphDataRepository
-                        .findAllGraphNodes();
+                        .findAllGraphNodes(
+                                graphVersionId
+                        );
 
         for (GraphNodeRow row : rows) {
 
@@ -112,14 +115,19 @@ public class CampusGraphInitializer {
                 );
             }
 
+            /*
+             * Entrance 자체는 graph에 유지하되,
+             * operational Building과 연결되지 않았다면
+             * Building routing 후보로는 등록하지 않는다.
+             */
             if (row.buildingId() == null) {
                 continue;
             }
 
             if (row.buildingName() == null
-                    || row
-                    .buildingName()
+                    || row.buildingName()
                     .isBlank()) {
+
                 throw new IllegalStateException(
                         "Entrance graph node references a building without a name. graphNodeId="
                                 + row.id()
@@ -130,59 +138,26 @@ public class CampusGraphInitializer {
                 );
             }
 
-            builder
-                    .addBuildingEntrance(
-                            row.buildingId(),
-                            row.buildingName(),
-                            row.id()
-                    );
+            builder.addBuildingEntrance(
+                    row.buildingId(),
+                    row.buildingName(),
+                    row.id()
+            );
         }
     }
 
     private void loadEdges(
-            CampusGraph.Builder builder
+            CampusGraph.Builder builder,
+            long graphVersionId
     ) {
+
         List<GraphEdgeRow> rows =
                 graphDataRepository
-                        .findAllGraphEdges();
-
-        Set<String> walkable =
-                properties.walkableHighways()
-                        == null
-
-                        ? Set.of()
-
-                        : properties
-                        .walkableHighways()
-                        .stream()
-                        .map(
-                                value ->
-                                        value
-                                                .toLowerCase(
-                                                        Locale.ROOT
-                                                )
-                        )
-                        .collect(
-                                Collectors
-                                        .toUnmodifiableSet()
+                        .findAllGraphEdges(
+                                graphVersionId
                         );
 
         for (GraphEdgeRow row : rows) {
-
-            if (!walkable.isEmpty()
-                    &&
-                    (
-                            row.highway() == null
-                                    ||
-                                    !walkable.contains(
-                                            row.highway()
-                                                    .toLowerCase(
-                                                            Locale.ROOT
-                                                    )
-                                    )
-                    )) {
-                continue;
-            }
 
             GraphNode source =
                     builder.getNode(
@@ -196,6 +171,7 @@ public class CampusGraphInitializer {
 
             if (source == null
                     || target == null) {
+
                 throw new IllegalStateException(
                         "Edge endpoint node not found. edgeId="
                                 + row.id()
