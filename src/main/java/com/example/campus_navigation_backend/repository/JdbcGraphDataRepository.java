@@ -28,42 +28,7 @@ public class JdbcGraphDataRepository
     }
 
     @Override
-    public long findActiveGraphVersionId() {
-
-        String sql = """
-                SELECT id
-                FROM routing.graph_versions
-                WHERE status = 'ACTIVE'
-                ORDER BY id
-                """;
-
-        List<Long> activeVersionIds =
-                jdbc.query(
-                        sql,
-                        new MapSqlParameterSource(),
-                        (rs, rowNum) ->
-                                rs.getLong("id")
-                );
-
-        if (activeVersionIds.isEmpty()) {
-            throw new IllegalStateException(
-                    "Active graph version does not exist."
-            );
-        }
-
-        if (activeVersionIds.size() > 1) {
-            throw new IllegalStateException(
-                    "Multiple active graph versions exist."
-            );
-        }
-
-        return activeVersionIds.get(0);
-    }
-
-    @Override
-    public List<GraphNodeRow> findAllGraphNodes(
-            long graphVersionId
-    ) {
+    public List<GraphNodeRow> findAllGraphNodes() {
 
         String sql = """
                 SELECT
@@ -95,25 +60,17 @@ public class JdbcGraphDataRepository
                   ON b.id = e.building_id
                  AND b.is_operational = TRUE
 
-                WHERE n.graph_version_id =
-                      :graphVersionId
-
                 ORDER BY n.id
                 """;
 
-        MapSqlParameterSource params =
-                new MapSqlParameterSource()
-                        .addValue(
-                                "graphVersionId",
-                                graphVersionId
-                        );
-
         return jdbc.query(
                 sql,
-                params,
+                new MapSqlParameterSource(),
                 (rs, rowNum) ->
                         new GraphNodeRow(
-                                rs.getLong("id"),
+                                rs.getLong(
+                                        "id"
+                                ),
                                 rs.getString(
                                         "node_type"
                                 ),
@@ -131,17 +88,21 @@ public class JdbcGraphDataRepository
                                 rs.getString(
                                         "building_name"
                                 ),
-                                rs.getDouble("x"),
-                                rs.getDouble("y"),
-                                rs.getDouble("z")
+                                rs.getDouble(
+                                        "x"
+                                ),
+                                rs.getDouble(
+                                        "y"
+                                ),
+                                rs.getDouble(
+                                        "z"
+                                )
                         )
         );
     }
 
     @Override
-    public List<GraphEdgeRow> findAllGraphEdges(
-            long graphVersionId
-    ) {
+    public List<GraphEdgeRow> findAllGraphEdges() {
 
         String sql = """
                 SELECT
@@ -160,27 +121,19 @@ public class JdbcGraphDataRepository
 
                 FROM routing.graph_edges
 
-                WHERE graph_version_id =
-                      :graphVersionId
-
-                  AND is_enabled = TRUE
+                WHERE is_enabled = TRUE
 
                 ORDER BY id
                 """;
 
-        MapSqlParameterSource params =
-                new MapSqlParameterSource()
-                        .addValue(
-                                "graphVersionId",
-                                graphVersionId
-                        );
-
         return jdbc.query(
                 sql,
-                params,
+                new MapSqlParameterSource(),
                 (rs, rowNum) ->
                         new GraphEdgeRow(
-                                rs.getLong("id"),
+                                rs.getLong(
+                                        "id"
+                                ),
                                 rs.getString(
                                         "highway"
                                 ),

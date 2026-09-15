@@ -74,10 +74,7 @@ CREATE TABLE routing.graph_versions (
 
 
 CREATE TABLE routing.graph_nodes (
-                                     graph_version_id BIGINT NOT NULL
-                                         REFERENCES routing.graph_versions(id),
-
-                                     id BIGINT NOT NULL,
+                                     id BIGINT PRIMARY KEY,
 
                                      node_type VARCHAR(30) NOT NULL,
 
@@ -86,23 +83,18 @@ CREATE TABLE routing.graph_nodes (
                                      entrance_id BIGINT
                                          REFERENCES spatial.entrances(id),
 
-                                     geom geometry(PointZ, 5186)
-        NOT NULL,
-
-                                     PRIMARY KEY (
-                                                  graph_version_id,
-                                                  id
-                                         )
+                                     geom geometry(PointZ, 5186) NOT NULL
 );
 
 
 CREATE TABLE routing.graph_edges (
-                                     graph_version_id BIGINT NOT NULL,
+                                     id BIGINT PRIMARY KEY,
 
-                                     id BIGINT NOT NULL,
+                                     source_node_id BIGINT NOT NULL
+                                         REFERENCES routing.graph_nodes(id),
 
-                                     source_node_id BIGINT NOT NULL,
-                                     target_node_id BIGINT NOT NULL,
+                                     target_node_id BIGINT NOT NULL
+                                         REFERENCES routing.graph_nodes(id),
 
                                      source_segment_id BIGINT
                                          REFERENCES spatial.navigation_segments(id),
@@ -119,28 +111,5 @@ CREATE TABLE routing.graph_edges (
                                          NOT NULL,
 
                                      is_enabled BOOLEAN NOT NULL
-                                                  DEFAULT TRUE,
-
-                                     PRIMARY KEY (
-                                                  graph_version_id,
-                                                  id
-                                         ),
-
-                                     FOREIGN KEY (
-                                                  graph_version_id,
-                                                  source_node_id
-                                         )
-                                         REFERENCES routing.graph_nodes(
-                                                                        graph_version_id,
-                                                                        id
-                                             ),
-
-                                     FOREIGN KEY (
-                                                  graph_version_id,
-                                                  target_node_id
-                                         )
-                                         REFERENCES routing.graph_nodes(
-                                                                        graph_version_id,
-                                                                        id
-                                             )
+                                                  DEFAULT TRUE
 );

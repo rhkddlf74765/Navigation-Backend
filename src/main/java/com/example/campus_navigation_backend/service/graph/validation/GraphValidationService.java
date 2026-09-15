@@ -4,10 +4,8 @@ import com.example.campus_navigation_backend.domain.graph.CampusGraph;
 import com.example.campus_navigation_backend.domain.graph.validation.GraphDatabaseValidator;
 import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationIssue;
 import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationReport;
-import com.example.campus_navigation_backend.repository.GraphValidationResultRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -19,51 +17,47 @@ public class GraphValidationService {
     private final JavaGraphValidator
             javaGraphValidator;
 
-    private final GraphValidationResultRepository
-            resultRepository;
-
     public GraphValidationService(
             GraphDatabaseValidator databaseValidator,
-            JavaGraphValidator javaGraphValidator,
-            GraphValidationResultRepository resultRepository
+            JavaGraphValidator javaGraphValidator
     ) {
         this.databaseValidator =
                 databaseValidator;
 
         this.javaGraphValidator =
                 javaGraphValidator;
-
-        this.resultRepository =
-                resultRepository;
     }
 
-    public GraphValidationReport validate(
-            long graphVersionId,
+    /**
+     * routing.graph_nodes / graph_edges 자체의
+     * DB 정합성을 검사한다.
+     *
+     * CampusGraph 생성 전에 호출해야 한다.
+     */
+    public GraphValidationReport validateDatabase() {
+
+        List<GraphValidationIssue> issues =
+                databaseValidator.validate();
+
+        return new GraphValidationReport(
+                issues
+        );
+    }
+
+    /**
+     * DB 데이터를 이용해 생성된 CampusGraph의
+     * topology 수준 정합성을 검사한다.
+     */
+    public GraphValidationReport validateGraph(
             CampusGraph graph
     ) {
 
         List<GraphValidationIssue> issues =
-                new ArrayList<>();
-
-        issues.addAll(
-                databaseValidator.validate(
-                        graphVersionId
-                )
-        );
-
-        issues.addAll(
                 javaGraphValidator.validate(
                         graph
-                )
-        );
-
-        resultRepository.replaceResults(
-                graphVersionId,
-                issues
-        );
+                );
 
         return new GraphValidationReport(
-                graphVersionId,
                 issues
         );
     }

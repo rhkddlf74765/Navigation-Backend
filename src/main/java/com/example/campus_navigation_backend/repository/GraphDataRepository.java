@@ -11,13 +11,7 @@ import java.util.List;
  */
 public interface GraphDataRepository {
 
-    long findActiveGraphVersionId();
+    List<GraphNodeRow> findAllGraphNodes();
 
-    List<GraphNodeRow> findAllGraphNodes(
-            long graphVersionId
-    );
-
-    List<GraphEdgeRow> findAllGraphEdges(
-            long graphVersionId
-    );
+    List<GraphEdgeRow> findAllGraphEdges();
 }

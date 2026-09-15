@@ -3,13 +3,14 @@ package com.example.campus_navigation_backend.domain.graph.validation;
 import java.util.List;
 
 public record GraphValidationReport(
-        long graphVersionId,
         List<GraphValidationIssue> issues
 ) {
 
     public GraphValidationReport {
 
-        issues = List.copyOf(
+        issues = issues == null
+                ? List.of()
+                : List.copyOf(
                 issues
         );
     }
@@ -21,6 +22,16 @@ public record GraphValidationReport(
                         issue ->
                                 issue.severity()
                                         == GraphValidationSeverity.ERROR
+                );
+    }
+
+    public boolean hasWarnings() {
+
+        return issues.stream()
+                .anyMatch(
+                        issue ->
+                                issue.severity()
+                                        == GraphValidationSeverity.WARNING
                 );
     }
 
@@ -42,6 +53,17 @@ public record GraphValidationReport(
                         issue ->
                                 issue.severity()
                                         == GraphValidationSeverity.WARNING
+                )
+                .count();
+    }
+
+    public long infoCount() {
+
+        return issues.stream()
+                .filter(
+                        issue ->
+                                issue.severity()
+                                        == GraphValidationSeverity.INFO
                 )
                 .count();
     }

@@ -1,8 +1,6 @@
 package com.example.campus_navigation_backend.domain.graph.validation;
 
 import com.example.campus_navigation_backend.config.NavigationProperties;
-import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationIssue;
-import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationSeverity;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -32,45 +30,36 @@ public class GraphDatabaseValidator {
         this.properties = properties;
     }
 
-    public List<GraphValidationIssue> validate(
-            long graphVersionId
-    ) {
+    public List<GraphValidationIssue> validate() {
 
         List<GraphValidationIssue> issues =
                 new ArrayList<>();
 
         validateGraphNotEmpty(
-                graphVersionId,
                 issues
         );
 
         validateEntranceInvariant(
-                graphVersionId,
                 issues
         );
 
         validateOperationalBuildings(
-                graphVersionId,
                 issues
         );
 
-        validateNodeSrid(
-                graphVersionId,
+        validateNodeGeometry(
                 issues
         );
 
-        validateEdgeSrid(
-                graphVersionId,
+        validateEdgeGeometry(
                 issues
         );
 
         validateEdgeEndpoints(
-                graphVersionId,
                 issues
         );
 
         validateEdgeDistances(
-                graphVersionId,
                 issues
         );
 
@@ -80,22 +69,16 @@ public class GraphDatabaseValidator {
     }
 
     private void validateGraphNotEmpty(
-            long graphVersionId,
             List<GraphValidationIssue> issues
     ) {
-
-        MapSqlParameterSource params =
-                params(graphVersionId);
 
         Integer nodeCount =
                 jdbc.queryForObject(
                         """
                         SELECT COUNT(*)
                         FROM routing.graph_nodes
-                        WHERE graph_version_id =
-                              :graphVersionId
                         """,
-                        params,
+                        new MapSqlParameterSource(),
                         Integer.class
                 );
 
@@ -104,11 +87,9 @@ public class GraphDatabaseValidator {
                         """
                         SELECT COUNT(*)
                         FROM routing.graph_edges
-                        WHERE graph_version_id =
-                              :graphVersionId
-                          AND is_enabled = TRUE
+                        WHERE is_enabled = TRUE
                         """,
-                        params,
+                        new MapSqlParameterSource(),
                         Integer.class
                 );
 
@@ -140,35 +121,31 @@ public class GraphDatabaseValidator {
     }
 
     private void validateEntranceInvariant(
-            long graphVersionId,
             List<GraphValidationIssue> issues
     ) {
 
         String sql = """
-            SELECT
-                id,
-                node_type,
-                entrance_id
-            FROM routing.graph_nodes
-            WHERE graph_version_id =
-                  :graphVersionId
-              AND (
-                    (
+                SELECT
+                    id,
+                    node_type,
+                    entrance_id
+
+                FROM routing.graph_nodes
+
+                WHERE (
                         node_type = 'ENTRANCE'
                         AND entrance_id IS NULL
-                    )
-                    OR
-                    (
+                      )
+                   OR (
                         node_type <> 'ENTRANCE'
                         AND entrance_id IS NOT NULL
-                    )
-              )
-            """;
+                      )
+                """;
 
         List<GraphValidationIssue> invalidNodes =
                 jdbc.query(
                         sql,
-                        params(graphVersionId),
+                        new MapSqlParameterSource(),
                         (rs, rowNum) ->
                                 error(
                                         "ENTRANCE_MAPPING_INVARIANT",
@@ -184,43 +161,45 @@ public class GraphDatabaseValidator {
     }
 
     private void validateOperationalBuildings(
-            long graphVersionId,
             List<GraphValidationIssue> issues
     ) {
 
         String sql = """
-            SELECT
-                b.id,
-                b.name
-            FROM spatial.buildings b
-            WHERE b.is_operational = TRUE
+                SELECT
+                    b.id,
+                    b.name
 
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM spatial.entrances e
+                FROM spatial.buildings b
 
-                  JOIN routing.graph_nodes n
-                    ON n.graph_version_id =
-                       :graphVersionId
-                   AND n.node_type = 'ENTRANCE'
-                   AND n.entrance_id = e.id
+                WHERE b.is_operational = TRUE
 
-                  WHERE e.building_id = b.id
-                    AND e.is_operational = TRUE
-              )
-            """;
+                  AND NOT EXISTS (
+                      SELECT 1
+
+                      FROM spatial.entrances e
+
+                      JOIN routing.graph_nodes n
+                        ON n.node_type = 'ENTRANCE'
+                       AND n.entrance_id = e.id
+
+                      WHERE e.building_id = b.id
+                        AND e.is_operational = TRUE
+                  )
+                """;
 
         List<GraphValidationIssue> invalidBuildings =
                 jdbc.query(
                         sql,
-                        params(graphVersionId),
+                        new MapSqlParameterSource(),
                         (rs, rowNum) ->
                                 error(
                                         "BUILDING_NO_ROUTABLE_ENTRANCE",
                                         "BUILDING",
                                         rs.getLong("id"),
                                         "Operational building has no routable entrance: "
-                                                + rs.getString("name")
+                                                + rs.getString(
+                                                "name"
+                                        )
                                 )
                 );
 
@@ -229,28 +208,25 @@ public class GraphDatabaseValidator {
         );
     }
 
-    private void validateNodeSrid(
-            long graphVersionId,
+    private void validateNodeGeometry(
             List<GraphValidationIssue> issues
     ) {
 
         String sql = """
-            SELECT id
-            FROM routing.graph_nodes
-            WHERE graph_version_id =
-                  :graphVersionId
-              AND (
-                  geom IS NULL
-                  OR ST_IsEmpty(geom)
-                  OR ST_SRID(geom)
-                     <> :metricSrid
-              )
-            """;
+                SELECT id
+
+                FROM routing.graph_nodes
+
+                WHERE geom IS NULL
+                   OR ST_IsEmpty(geom)
+                   OR ST_SRID(geom)
+                      <> :metricSrid
+                """;
 
         List<GraphValidationIssue> invalidNodes =
                 jdbc.query(
                         sql,
-                        params(graphVersionId),
+                        params(),
                         (rs, rowNum) ->
                                 error(
                                         "INVALID_NODE_GEOMETRY",
@@ -265,28 +241,25 @@ public class GraphDatabaseValidator {
         );
     }
 
-    private void validateEdgeSrid(
-            long graphVersionId,
+    private void validateEdgeGeometry(
             List<GraphValidationIssue> issues
     ) {
 
         String sql = """
-            SELECT id
-            FROM routing.graph_edges
-            WHERE graph_version_id =
-                  :graphVersionId
-              AND (
-                  geom IS NULL
-                  OR ST_IsEmpty(geom)
-                  OR ST_SRID(geom)
-                     <> :metricSrid
-              )
-            """;
+                SELECT id
+
+                FROM routing.graph_edges
+
+                WHERE geom IS NULL
+                   OR ST_IsEmpty(geom)
+                   OR ST_SRID(geom)
+                      <> :metricSrid
+                """;
 
         List<GraphValidationIssue> invalidEdges =
                 jdbc.query(
                         sql,
-                        params(graphVersionId),
+                        params(),
                         (rs, rowNum) ->
                                 error(
                                         "INVALID_EDGE_GEOMETRY",
@@ -302,7 +275,6 @@ public class GraphDatabaseValidator {
     }
 
     private void validateEdgeEndpoints(
-            long graphVersionId,
             List<GraphValidationIssue> issues
     ) {
 
@@ -327,82 +299,79 @@ public class GraphDatabaseValidator {
                 FROM routing.graph_edges e
 
                 JOIN routing.graph_nodes s
-                  ON s.graph_version_id =
-                     e.graph_version_id
-                 AND s.id =
+                  ON s.id =
                      e.source_node_id
 
                 JOIN routing.graph_nodes t
-                  ON t.graph_version_id =
-                     e.graph_version_id
-                 AND t.id =
+                  ON t.id =
                      e.target_node_id
 
-                WHERE e.graph_version_id =
-                      :graphVersionId
+                WHERE
+                    ST_Distance(
+                        ST_Force2D(
+                            ST_StartPoint(e.geom)
+                        ),
+                        ST_Force2D(s.geom)
+                    ) > :endpointTolerance
 
-                  AND (
-                      ST_Distance(
-                          ST_Force2D(
-                              ST_StartPoint(e.geom)
-                          ),
-                          ST_Force2D(s.geom)
-                      ) > :endpointTolerance
+                    OR
 
-                      OR
-
-                      ST_Distance(
-                          ST_Force2D(
-                              ST_EndPoint(e.geom)
-                          ),
-                          ST_Force2D(t.geom)
-                      ) > :endpointTolerance
-                  )
+                    ST_Distance(
+                        ST_Force2D(
+                            ST_EndPoint(e.geom)
+                        ),
+                        ST_Force2D(t.geom)
+                    ) > :endpointTolerance
                 """;
 
         MapSqlParameterSource params =
-                params(graphVersionId)
+                params()
                         .addValue(
                                 "endpointTolerance",
                                 ENDPOINT_TOLERANCE_METERS
                         );
 
-        jdbc.query(
-                sql,
-                params,
-                rs -> {
+        List<GraphValidationIssue> invalidEdges =
+                jdbc.query(
+                        sql,
+                        params,
+                        (rs, rowNum) -> {
 
-                    long edgeId =
-                            rs.getLong("id");
+                            long edgeId =
+                                    rs.getLong(
+                                            "id"
+                                    );
 
-                    double sourceError =
-                            rs.getDouble(
-                                    "source_error_m"
-                            );
+                            double sourceError =
+                                    rs.getDouble(
+                                            "source_error_m"
+                                    );
 
-                    double targetError =
-                            rs.getDouble(
-                                    "target_error_m"
-                            );
+                            double targetError =
+                                    rs.getDouble(
+                                            "target_error_m"
+                                    );
 
-                    issues.add(
-                            error(
+                            return error(
                                     "EDGE_ENDPOINT_MISMATCH",
                                     "GRAPH_EDGE",
                                     edgeId,
-                                    "Edge endpoint mismatch. sourceError="
+                                    "Edge endpoint mismatch. "
+                                            + "sourceError="
                                             + sourceError
                                             + "m, targetError="
                                             + targetError
                                             + "m"
-                            )
-                    );
-                }
+                            );
+                        }
+                );
+
+        issues.addAll(
+                invalidEdges
         );
     }
 
     private void validateEdgeDistances(
-            long graphVersionId,
             List<GraphValidationIssue> issues
     ) {
 
@@ -417,54 +386,65 @@ public class GraphDatabaseValidator {
 
                 FROM routing.graph_edges
 
-                WHERE graph_version_id =
-                      :graphVersionId
-
-                  AND ABS(
-                      distance_m
-                      -
-                      ST_Length(
-                          ST_Force2D(geom)
-                      )
-                  ) > :distanceTolerance
+                WHERE ABS(
+                    distance_m
+                    -
+                    ST_Length(
+                        ST_Force2D(geom)
+                    )
+                ) > :distanceTolerance
                 """;
 
         MapSqlParameterSource params =
-                params(graphVersionId)
+                params()
                         .addValue(
                                 "distanceTolerance",
                                 DISTANCE_TOLERANCE_METERS
                         );
 
-        jdbc.query(
-                sql,
-                params,
-                rs -> {
+        List<GraphValidationIssue> invalidEdges =
+                jdbc.query(
+                        sql,
+                        params,
+                        (rs, rowNum) -> {
 
-                    long edgeId =
-                            rs.getLong("id");
+                            long edgeId =
+                                    rs.getLong(
+                                            "id"
+                                    );
 
-                    issues.add(
-                            error(
+                            double storedDistance =
+                                    rs.getDouble(
+                                            "distance_m"
+                                    );
+
+                            double geometryDistance =
+                                    rs.getDouble(
+                                            "geometry_distance_m"
+                                    );
+
+                            return error(
                                     "EDGE_DISTANCE_MISMATCH",
                                     "GRAPH_EDGE",
                                     edgeId,
-                                    "Stored distance does not match geometry length."
-                            )
-                    );
-                }
+                                    "Stored distance does not match geometry length. "
+                                            + "stored="
+                                            + storedDistance
+                                            + "m, geometry="
+                                            + geometryDistance
+                                            + "m"
+                            );
+                        }
+                );
+
+        issues.addAll(
+                invalidEdges
         );
     }
 
-    private MapSqlParameterSource params(
-            long graphVersionId
-    ) {
+    private MapSqlParameterSource params() {
 
         return new MapSqlParameterSource()
-                .addValue(
-                        "graphVersionId",
-                        graphVersionId
-                )
                 .addValue(
                         "metricSrid",
                         properties.metricSrid()

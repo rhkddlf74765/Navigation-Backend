@@ -32,36 +32,29 @@ public class CampusGraphLoader {
                 edgeCostPolicy;
     }
 
-    public CampusGraph load(
-            long graphVersionId
-    ) {
+    public CampusGraph load() {
 
         CampusGraph.Builder builder =
                 CampusGraph.builder();
 
         loadNodes(
-                builder,
-                graphVersionId
+                builder
         );
 
         loadEdges(
-                builder,
-                graphVersionId
+                builder
         );
 
         return builder.build();
     }
 
     private void loadNodes(
-            CampusGraph.Builder builder,
-            long graphVersionId
+            CampusGraph.Builder builder
     ) {
 
         List<GraphNodeRow> rows =
                 graphDataRepository
-                        .findAllGraphNodes(
-                                graphVersionId
-                        );
+                        .findAllGraphNodes();
 
         for (GraphNodeRow row : rows) {
 
@@ -73,6 +66,7 @@ public class CampusGraphLoader {
 
             if (row.graphNodeType()
                     != GraphNodeType.ENTRANCE) {
+
                 continue;
             }
 
@@ -84,7 +78,14 @@ public class CampusGraphLoader {
                 );
             }
 
+            /*
+             * Entrance graph node 자체는 유지한다.
+             *
+             * 다만 operational Building과 연결되지 않은 경우
+             * Building routing 후보로는 등록하지 않는다.
+             */
             if (row.buildingId() == null) {
+
                 continue;
             }
 
@@ -93,8 +94,13 @@ public class CampusGraphLoader {
                     .isBlank()) {
 
                 throw new IllegalStateException(
-                        "Entrance graph node references a building without a name. graphNodeId="
+                        "Entrance graph node references a building without a name. "
+                                + "graphNodeId="
                                 + row.id()
+                                + ", entranceId="
+                                + row.entranceId()
+                                + ", buildingId="
+                                + row.buildingId()
                 );
             }
 
@@ -107,15 +113,12 @@ public class CampusGraphLoader {
     }
 
     private void loadEdges(
-            CampusGraph.Builder builder,
-            long graphVersionId
+            CampusGraph.Builder builder
     ) {
 
         List<GraphEdgeRow> rows =
                 graphDataRepository
-                        .findAllGraphEdges(
-                                graphVersionId
-                        );
+                        .findAllGraphEdges();
 
         for (GraphEdgeRow row : rows) {
 
@@ -133,8 +136,13 @@ public class CampusGraphLoader {
                     || target == null) {
 
                 throw new IllegalStateException(
-                        "Edge endpoint node not found. edgeId="
+                        "Edge endpoint node not found. "
+                                + "edgeId="
                                 + row.id()
+                                + ", sourceNodeId="
+                                + row.source()
+                                + ", targetNodeId="
+                                + row.target()
                 );
             }
 

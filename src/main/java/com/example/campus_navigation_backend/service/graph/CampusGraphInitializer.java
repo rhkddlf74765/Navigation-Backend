@@ -2,10 +2,13 @@ package com.example.campus_navigation_backend.service.graph;
 
 import com.example.campus_navigation_backend.domain.graph.CampusGraph;
 import com.example.campus_navigation_backend.domain.graph.CampusGraphStore;
+import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationIssue;
 import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationReport;
+import com.example.campus_navigation_backend.domain.graph.validation.GraphValidationSeverity;
 import com.example.campus_navigation_backend.infrastructure.spatial.EdgeSpatialIndex;
-import com.example.campus_navigation_backend.repository.GraphDataRepository;
 import com.example.campus_navigation_backend.service.graph.validation.GraphValidationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Service;
@@ -14,8 +17,10 @@ import org.springframework.stereotype.Service;
 public class CampusGraphInitializer
         implements ApplicationRunner {
 
-    private final GraphDataRepository
-            graphDataRepository;
+    private static final Logger log =
+            LoggerFactory.getLogger(
+                    CampusGraphInitializer.class
+            );
 
     private final CampusGraphLoader
             campusGraphLoader;
@@ -30,15 +35,11 @@ public class CampusGraphInitializer
             edgeSpatialIndex;
 
     public CampusGraphInitializer(
-            GraphDataRepository graphDataRepository,
             CampusGraphLoader campusGraphLoader,
             GraphValidationService graphValidationService,
             CampusGraphStore campusGraphStore,
             EdgeSpatialIndex edgeSpatialIndex
     ) {
-        this.graphDataRepository =
-                graphDataRepository;
-
         this.campusGraphLoader =
                 campusGraphLoader;
 
@@ -57,46 +58,74 @@ public class CampusGraphInitializer
             ApplicationArguments args
     ) {
 
-        long graphVersionId =
-                graphDataRepository
-                        .findActiveGraphVersionId();
+        log.info(
+                "Starting routing graph initialization."
+        );
 
         /*
-         * DB에서 ACTIVE graph를 읽어
-         * 아직 서비스에 등록하지 않은 임시 객체로 만든다.
+         * 1.
+         * CampusGraph을 만들기 전에
+         * DB graph source 자체를 검증한다.
          */
-        CampusGraph graph =
-                campusGraphLoader.load(
-                        graphVersionId
-                );
-
-        /*
-         * DB + Java graph 검증
-         */
-        GraphValidationReport report =
+        GraphValidationReport databaseReport =
                 graphValidationService
-                        .validate(
-                                graphVersionId,
-                                graph
-                        );
+                        .validateDatabase();
 
-        /*
-         * ERROR가 하나라도 있으면
-         * 실제 CampusGraphStore에는 등록하지 않는다.
-         */
-        if (report.hasErrors()) {
+        logValidationIssues(
+                "DATABASE",
+                databaseReport
+        );
+
+        if (databaseReport.hasErrors()) {
 
             throw new IllegalStateException(
-                    "Active graph validation failed. "
-                            + "graphVersionId="
-                            + graphVersionId
-                            + ", errors="
-                            + report.errorCount()
+                    "Routing graph database validation failed. "
+                            + "errors="
+                            + databaseReport.errorCount()
                             + ", warnings="
-                            + report.warningCount()
+                            + databaseReport.warningCount()
             );
         }
 
+        /*
+         * 2.
+         * 검증된 graph_nodes / graph_edges를 이용해
+         * runtime CampusGraph을 생성한다.
+         */
+        CampusGraph graph =
+                campusGraphLoader.load();
+
+        /*
+         * 3.
+         * 메모리상의 실제 routing topology를 검증한다.
+         */
+        GraphValidationReport graphReport =
+                graphValidationService
+                        .validateGraph(
+                                graph
+                        );
+
+        logValidationIssues(
+                "JAVA_GRAPH",
+                graphReport
+        );
+
+        if (graphReport.hasErrors()) {
+
+            throw new IllegalStateException(
+                    "Runtime routing graph validation failed. "
+                            + "errors="
+                            + graphReport.errorCount()
+                            + ", warnings="
+                            + graphReport.warningCount()
+            );
+        }
+
+        /*
+         * 4.
+         * 모든 검증에 성공한 경우에만
+         * 실제 서비스용 graph로 등록한다.
+         */
         campusGraphStore.initialize(
                 graph
         );
@@ -104,5 +133,73 @@ public class CampusGraphInitializer
         edgeSpatialIndex.initialize(
                 graph.getPhysicalEdges()
         );
+
+        log.info(
+                "Routing graph initialization completed successfully. "
+                        + "nodes={}, edges={}",
+                graph.getNodes().size(),
+                graph.getPhysicalEdges().size()
+        );
+    }
+
+    private void logValidationIssues(
+            String stage,
+            GraphValidationReport report
+    ) {
+
+        for (GraphValidationIssue issue
+                : report.issues()) {
+
+            if (issue.severity()
+                    == GraphValidationSeverity.ERROR) {
+
+                log.error(
+                        "[Graph validation][{}] "
+                                + "rule={}, "
+                                + "entityType={}, "
+                                + "entityId={}, "
+                                + "message={}",
+                        stage,
+                        issue.ruleCode(),
+                        issue.entityType(),
+                        issue.entityId(),
+                        issue.message()
+                );
+
+                continue;
+            }
+
+            if (issue.severity()
+                    == GraphValidationSeverity.WARNING) {
+
+                log.warn(
+                        "[Graph validation][{}] "
+                                + "rule={}, "
+                                + "entityType={}, "
+                                + "entityId={}, "
+                                + "message={}",
+                        stage,
+                        issue.ruleCode(),
+                        issue.entityType(),
+                        issue.entityId(),
+                        issue.message()
+                );
+
+                continue;
+            }
+
+            log.info(
+                    "[Graph validation][{}] "
+                            + "rule={}, "
+                            + "entityType={}, "
+                            + "entityId={}, "
+                            + "message={}",
+                    stage,
+                    issue.ruleCode(),
+                    issue.entityType(),
+                    issue.entityId(),
+                    issue.message()
+            );
+        }
     }
 }
